@@ -1,0 +1,109 @@
+.el-modal {
+    width: 700px;
+    max-width: 92vw;
+}
+
+.el-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 65vh;
+}
+
+.el-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.el-filter-btn {
+    border: 1px solid var(--background-modifier-accent);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.el-filter-btn:hover {
+    background: var(--background-modifier-hover);
+}
+
+.el-filter-btn.active {
+    background: var(--brand-500, #5865f2);
+    color: #fff;
+    border-color: transparent;
+}
+
+.el-clear-btn {
+    margin-left: auto;
+    border: 1px solid var(--background-modifier-accent);
+    background: transparent;
+    color: var(--status-danger);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.el-clear-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.el-list {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.el-entry {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: start;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--background-secondary);
+}
+
+.el-entry-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.el-entry-body {
+    min-width: 0;
+}
+
+.el-entry-summary {
+    font-size: 13px;
+    color: var(--text-normal);
+}
+
+.el-entry-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.el-entry-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.el-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 30px;
+}

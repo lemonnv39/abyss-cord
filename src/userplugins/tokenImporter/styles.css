@@ -1,0 +1,175 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-tokenimporter-tab-bar {
+    border-bottom: 1px solid var(--border-subtle);
+    margin: 16px 16px 0;
+    display: flex;
+    align-items: stretch;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.vc-tokenimporter-tab {
+    border-bottom: 2px solid transparent;
+    color: var(--interactive-normal);
+    cursor: pointer;
+    padding: 8px 4px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.vc-tokenimporter-tab:where(.vc-tokenimporter-selected, :hover, :focus) {
+    color: var(--interactive-active);
+    border-bottom-color: var(--brand-500);
+}
+
+.vc-tokenimporter-tab-content {
+    padding: 16px;
+}
+
+.vc-tokenimporter-empty {
+    color: var(--text-muted);
+    padding: 24px 0;
+    text-align: center;
+}
+
+.vc-tokenimporter-my-token-btn {
+    margin-bottom: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vc-tokenimporter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vc-tokenimporter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.vc-tokenimporter-row:hover {
+    background: var(--background-modifier-hover);
+}
+
+.vc-tokenimporter-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.vc-tokenimporter-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vc-tokenimporter-username {
+    color: var(--header-primary);
+    font-weight: 600;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-tokenimporter-token-hidden {
+    color: var(--text-muted);
+    font-family: var(--font-code);
+    font-size: 12px;
+}
+
+.vc-tokenimporter-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.vc-tokenimporter-icon-btn {
+    background: none;
+    border: none;
+    color: var(--interactive-normal);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.vc-tokenimporter-icon-btn:hover {
+    color: var(--interactive-hover);
+    background: var(--background-modifier-selected);
+}
+
+.vc-tokenimporter-icon-btn--danger:hover {
+    color: var(--text-danger);
+}
+
+.vc-tokenimporter-hint {
+    margin-bottom: 8px;
+}
+
+.vc-tokenimporter-textarea {
+    width: 100%;
+    min-height: 100px;
+    background: var(--input-background);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 8px;
+    padding: 10px;
+    font-family: var(--font-code);
+    font-size: 13px;
+    resize: vertical;
+}
+
+.vc-tokenimporter-textarea:focus {
+    outline: none;
+    border-color: var(--brand-500);
+}
+
+.vc-tokenimporter-add-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.vc-tokenimporter-detected {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.vc-tokenimporter-results {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vc-tokenimporter-result-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.vc-tokenimporter-result-row--valid {
+    color: var(--text-positive);
+}
+
+.vc-tokenimporter-result-row--invalid {
+    color: var(--text-danger);
+}

@@ -1,0 +1,298 @@
+.vc-client-diagnostics-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.vc-client-diagnostics-tabs {
+    margin-bottom: 16px;
+}
+
+.vc-client-diagnostics-page {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.vc-client-diagnostics-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vc-client-diagnostics-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.vc-client-diagnostics-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.vc-client-diagnostics-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.vc-client-diagnostics-search-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.vc-client-diagnostics-search-input {
+    flex: 1;
+}
+
+.vc-client-diagnostics-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+}
+
+.vc-client-diagnostics-row {
+    display: grid;
+    grid-template-columns: 1.6fr 0.7fr 0.7fr 0.6fr 0.5fr 0.8fr 0.8fr 0.7fr 1fr 0.7fr;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+}
+
+.vc-client-diagnostics-row.head {
+    color: var(--text-muted);
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--background-modifier-accent);
+}
+
+.vc-client-diagnostics-row.body:hover {
+    background: var(--background-modifier-hover);
+}
+
+.vc-client-diagnostics-plugin-cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vc-client-diagnostics-impact.high { color: var(--status-danger); }
+.vc-client-diagnostics-impact.medium { color: var(--status-warning); }
+.vc-client-diagnostics-impact.low { color: var(--status-positive); }
+.vc-client-diagnostics-impact.idle { color: var(--text-muted); }
+
+.vc-client-diagnostics-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 30px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.vc-client-diagnostics-analysis-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
+.vc-client-diagnostics-analysis-card {
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.vc-client-diagnostics-analysis-card.selected {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-client-diagnostics-analysis-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vc-client-diagnostics-analysis-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vc-client-diagnostics-analysis-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.vc-client-diagnostics-analysis-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vc-client-diagnostics-reason-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vc-client-diagnostics-reason-list.compact {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.vc-client-diagnostics-reason-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-client-diagnostics-reason {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--background-secondary);
+    flex-shrink: 0;
+}
+
+.vc-client-diagnostics-reason.high { background: rgba(237, 66, 69, 0.15); }
+.vc-client-diagnostics-reason.medium { background: rgba(240, 178, 50, 0.15); }
+.vc-client-diagnostics-reason.low { background: rgba(59, 165, 92, 0.15); }
+
+.vc-client-diagnostics-details {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 8px;
+    border-top: 1px solid var(--background-modifier-accent);
+}
+
+.vc-client-diagnostics-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.vc-client-diagnostics-detail-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vc-client-diagnostics-surface-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vc-client-diagnostics-surface-row {
+    display: grid;
+    grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.vc-client-diagnostics-snippet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.vc-client-diagnostics-snippet {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vc-client-diagnostics-snippet-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-client-diagnostics-snippet-code {
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: 6px;
+}
+
+.vc-client-diagnostics-monitor-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 14px;
+    min-height: 0;
+    flex: 1;
+}
+
+.vc-client-diagnostics-monitor-results {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+}
+
+.vc-client-diagnostics-monitor-result {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.vc-client-diagnostics-monitor-result.selected {
+    background: var(--background-modifier-selected);
+}
+
+.vc-client-diagnostics-monitor-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.vc-client-diagnostics-monitor-panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.vc-client-diagnostics-guide-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vc-client-diagnostics-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.vc-client-diagnostics-guide-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--background-secondary);
+}

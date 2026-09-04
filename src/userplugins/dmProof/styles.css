@@ -1,0 +1,18 @@
+/* DMProof — blurs each DM list row until hovered */
+
+/* "interactive_" is only present on the currently-selected row, not every
+   row — matching on it alone left every other conversation unblurred.
+   "channel_" is common to every row (selected or not), but it's ALSO used
+   by the Amis/Boutique/Nitro/Quêtes nav links above "Messages privés",
+   which live in the same "privateChannels_" container. Those nav rows
+   render an SVG icon, not a user avatar <img>, so scope the blur to rows
+   that actually contain an avatar image — real conversations only. */
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img[src*="/avatars/"]) {
+    filter: blur(6px);
+    transition: filter 0.15s ease-in-out;
+}
+
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img[src*="/avatars/"]):hover,
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img[src*="/avatars/"]):focus-within {
+    filter: none;
+}

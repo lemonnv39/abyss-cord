@@ -1,0 +1,119 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.cfr-content {
+    padding: 14px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cfr-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.25);
+    border: 1.5px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    transition: border-color .15s;
+}
+.cfr-search-bar:focus-within { border-color: rgba(255,255,255,0.22); }
+
+.cfr-search-input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: #fff; font-size: 13px; font-family: inherit;
+}
+.cfr-search-input::placeholder { color: rgba(255,255,255,0.35); }
+
+.cfr-search-clear {
+    background: none; border: none; color: rgba(255,255,255,0.4);
+    cursor: pointer; font-size: 12px; padding: 0 2px; transition: color .1s; line-height: 1;
+}
+.cfr-search-clear:hover { color: rgba(255,255,255,0.8); }
+
+.cfr-search-sep {
+    width: 1px; height: 16px; background: rgba(255,255,255,0.1); flex-shrink: 0;
+}
+
+.cfr-select-all {
+    background: none; border: none; color: rgba(255,255,255,0.6);
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    padding: 0 2px; white-space: nowrap; transition: color .1s; font-family: inherit;
+    display: flex; align-items: center; gap: 5px;
+}
+.cfr-select-all:hover { color: #fff; }
+.cfr-select-all span { color: inherit; }
+
+.cfr-selected-count { color: var(--brand-500, #5865f2); font-weight: 700; }
+
+@keyframes cfr-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.cfr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 310px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+.cfr-list::-webkit-scrollbar { width: 4px; }
+.cfr-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+.cfr-empty {
+    text-align: center; color: rgba(255,255,255,0.45) !important; font-size: 13px; padding: 20px 0;
+}
+
+.cfr-content h5,
+.cfr-content .cfr-count {
+    color: #ffffff !important;
+}
+
+.cfr-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    background: rgba(255,255,255,0.04);
+    transition: background .1s, border-color .1s;
+    user-select: none;
+}
+.cfr-row:hover { background: rgba(255,255,255,0.07); }
+.cfr-row--selected { border-color: var(--brand-500, #5865f2); background: rgba(88,101,242,0.1); }
+.cfr-row--selected:hover { background: rgba(88,101,242,0.15); }
+
+.cfr-checkbox { font-size: 14px; flex-shrink: 0; }
+
+.cfr-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+
+.cfr-info { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cfr-name { font-size: 14px; font-weight: 600; color: #ffffff !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cfr-tag  { font-size: 12px; color: rgba(255,255,255,0.55) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.cfr-progress-wrap {
+    display: flex; align-items: center; gap: 10px;
+}
+.cfr-progress-bar {
+    flex: 1; height: 4px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden;
+}
+.cfr-progress-fill { height: 100%; background: var(--brand-500, #5865f2); border-radius: 99px; transition: width .3s ease; }
+.cfr-progress-label { font-size: 12px; color: var(--header-secondary, rgba(255,255,255,0.5)); flex-shrink: 0; min-width: 36px; text-align: right; }
+
+.cfr-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: none; border-radius: 6px; padding: 9px 16px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: opacity .15s, background .15s; color: #fff; font-family: inherit;
+}
+.cfr-btn:disabled { opacity: .4; cursor: not-allowed; }
+.cfr-btn-secondary { background: rgba(255,255,255,0.08); flex-shrink: 0; }
+.cfr-btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.13); }
+.cfr-btn-danger { background: #ed4245; }
+.cfr-btn-danger:hover:not(:disabled) { background: #c23b3e; }

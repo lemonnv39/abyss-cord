@@ -1,0 +1,111 @@
+:root {
+    --vc-donatebutton: #ffc1cbc2;
+    --vc-donatebutton-secondary: #f7536fe5;
+}
+
+.vc-donatebutton {
+    background-color: var(--background-base-low) !important;
+    border-color: var(--vc-donatebutton) !important;
+    filter: brightness(1);
+    border-width: .1rem !important;
+    border-style: solid !important;
+}
+
+.vc-donatebutton:hover {
+    background-color: var(--vc-donatebutton) !important;
+    border-color: transparent !important;
+}
+
+
+.vc-joindiscordbutton {
+    background-color: var(--channeltextarea-background) !important;
+}
+
+.vc-joindiscordbutton:hover {
+    background-color: var(--redesign-button-tertiary-pressed-background) !important;
+}
+
+.vc-settings-card-buttons {
+    display: flex;
+    gap: 1em !important;
+    margin-left: .2rem;
+    margin-bottom: .2rem;
+}
+
+.vc-settingbuttons {
+    border-radius: 5px !important;
+}
+
+.form-switch-warning {
+    font-size: 16px;
+    background-color: rgb(240 71 71 / 10%);
+    color: rgb(240 71 71);
+    border: 1px solid rgb(240 71 71 / 60%);
+    border-radius: 4px;
+    font-weight: 500;
+    padding: 6px 10px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.vc-vencord-tab-settings-link {
+    color: var(--text-link);
+    display: inline-block;
+}
+
+/* Signature « abysse » : un trou noir lent en tête du panneau Abyss.
+   Anneau d'accrétion qui tourne + cœur sombre qui respire. Pur CSS, un seul
+   endroit (dosage assumé), désactivé si l'utilisateur réduit les animations. */
+.vc-vencord-tab-abyss {
+    position: relative;
+    height: 92px;
+    margin: 2px 0 16px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.vc-vencord-tab-abyss::before {
+    content: "";
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0%,
+        rgb(255 255 255 / 60%) 14%,
+        transparent 40%,
+        rgb(138 120 255 / 45%) 66%,
+        transparent 92%
+    );
+    -webkit-mask: radial-gradient(circle, transparent 31%, #000 34%, #000 49%, transparent 53%);
+    mask: radial-gradient(circle, transparent 31%, #000 34%, #000 49%, transparent 53%);
+    animation: vc-abyss-spin 7s linear infinite;
+}
+
+.vc-vencord-tab-abyss::after {
+    content: "";
+    position: absolute;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #000 52%, rgb(120 100 220 / 35%) 76%, transparent 100%);
+    box-shadow: 0 0 28px 6px rgb(96 74 200 / 32%);
+    animation: vc-abyss-pulse 4.5s ease-in-out infinite;
+}
+
+@keyframes vc-abyss-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes vc-abyss-pulse {
+    0%, 100% { transform: scale(1); opacity: .9; }
+    50% { transform: scale(1.08); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vc-vencord-tab-abyss::before,
+    .vc-vencord-tab-abyss::after {
+        animation: none;
+    }
+}
