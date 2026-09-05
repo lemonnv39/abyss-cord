@@ -13,6 +13,13 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 - Repo workspace reorg: `git init` safety net, this `CHANGELOG.md`,
   `version.json`, and a real `CLAUDE.md` (replacing the broken 6-byte stub).
 
+### Removed
+- `SkinwalkerProfile` plugin, at the user's request.
+- Leftover GhostAccount runtime artifacts from before it was removed from
+  Abyss: `abyss-ghost-config.json` and `abyss-ghost-preloads/` in the
+  Discord/Canary data folders, plus the orphaned `GhostAccount` and
+  `SkinwalkerProfile` entries in `settings.json`.
+
 ## [1.0.0] — 2026-09-05
 
 ### Added
