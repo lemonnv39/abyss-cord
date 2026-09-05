@@ -32,8 +32,8 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 - `injector/` — a separate Tauri v2 (Rust + Svelte 5) sub-project: a
   standalone "Abyss Injector" app that detects Discord installs and
   patches/unpatches them, with its own auto-updater and a build-update
-  channel that downloads the latest `patcher.js` etc. from the public
-  `abyss-builds` repo, so it can be shared with people who have neither this
+  channel that downloads the latest `patcher.js` etc. from this repo's
+  `builds` branch, so it can be shared with people who have neither this
   repo nor Node installed. See `injector/README.md`.
 
 ### Fixed

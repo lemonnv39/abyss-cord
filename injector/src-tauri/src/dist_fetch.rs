@@ -1,8 +1,9 @@
 /*
  * Récupère le build JS d'Abyss (patcher.js/preload.js/renderer.js/
- * renderer.css) depuis abyss-builds — un repo public alimenté automatiquement
- * par .github/workflows/publish-dist.yml du repo principal à chaque push sur
- * master — plutôt que d'exiger un clone local d'Abyss avec Node/pnpm.
+ * renderer.css) depuis la branche "builds" du repo principal
+ * (lemonnv39/abyss-cord) — alimentée automatiquement par
+ * .github/workflows/publish-dist.yml à chaque push sur main — plutôt que
+ * d'exiger un clone local d'Abyss avec Node/pnpm.
  *
  * C'est ce qui permet à quelqu'un qui n'a QUE l'exe de l'injecteur (aucun
  * repo, aucun Node) de patcher son Discord : le champ "Dossier du repo
@@ -10,10 +11,11 @@
  * local, mais n'est plus requis.
  *
  * Ce module gère aussi la détection de nouvelle version : le SHA du dernier
- * commit d'abyss-builds est mis en cache à côté des fichiers téléchargés ;
- * un check silencieux au lancement (voir spawn_silent_check) le compare au
- * SHA distant et prévient le frontend si ça a changé, séparément du check de
- * mise à jour de l'injecteur lui-même (qui, lui, passe par updater.rs).
+ * commit sur la branche "builds" est mis en cache à côté des fichiers
+ * téléchargés ; un check silencieux au lancement (voir spawn_silent_check)
+ * le compare au SHA distant et prévient le frontend si ça a changé,
+ * séparément du check de mise à jour de l'injecteur lui-même (qui, lui,
+ * passe par updater.rs).
  */
 
 use serde::Deserialize;
@@ -21,8 +23,8 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
 
-const BUILD_BASE_URL: &str = "https://raw.githubusercontent.com/0ctane6/abyss-builds/master";
-const COMMITS_API_URL: &str = "https://api.github.com/repos/0ctane6/abyss-builds/commits/master";
+const BUILD_BASE_URL: &str = "https://raw.githubusercontent.com/lemonnv39/abyss-cord/builds";
+const COMMITS_API_URL: &str = "https://api.github.com/repos/lemonnv39/abyss-cord/commits/builds";
 const FILES: &[&str] = &["patcher.js", "preload.js", "renderer.js", "renderer.css"];
 
 #[derive(Deserialize)]

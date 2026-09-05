@@ -24,11 +24,13 @@ Points clés à retenir :
   [Vencord/Installer](https://github.com/Vencord/Installer) (Go) — détection
   des installs Discord, patch/dépatch de `app.asar` — avec une UI Tauri au
   lieu de la CLI/GUI Go d'origine. Par défaut, `patcher.js` est téléchargé
-  depuis le repo public `0ctane6/abyss-builds` (alimenté par
-  `publish-dist.yml` à chaque push sur `master`) plutôt que lu depuis un
-  clone local : c'est ce qui permet d'envoyer l'`.exe` de l'injecteur à
-  quelqu'un qui n'a ni le repo ni Node — un chemin de repo local reste
-  possible en override optionnel pour tester un build non poussé.
+  depuis la branche `builds` de CE MÊME repo (alimentée par
+  `publish-dist.yml` à chaque push sur `main` — pas besoin de clé de
+  déploiement, le `GITHUB_TOKEN` par défaut suffit puisque c'est le même
+  repo) plutôt que lu depuis un clone local : c'est ce qui permet d'envoyer
+  l'`.exe` de l'injecteur à quelqu'un qui n'a ni le repo ni Node — un
+  chemin de repo local reste possible en override optionnel pour tester un
+  build non poussé.
 - **Mise à jour** : passe par `tauri-plugin-updater` officiel (pas de fetch
   GitHub custom), avec sa propre paire de clés de signature — **jamais**
   commit la clé privée. Voir `injector/README.md` pour la génération des

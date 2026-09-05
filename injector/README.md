@@ -130,17 +130,17 @@ Porté de la logique Go de [Vencord/Installer](https://github.com/Vencord/Instal
 Deux sources possibles, gérées par `patcher.rs`/`dist_fetch.rs` :
 
 - **Par défaut (cas d'un ami qui n'a QUE l'exe)** : téléchargé et mis en
-  cache depuis [`0ctane6/abyss-builds`](https://github.com/0ctane6/abyss-builds)
-  — un repo public alimenté automatiquement par
-  `.github/workflows/publish-dist.yml` du repo principal à chaque push sur
-  `master`. Aucun clone du repo, aucun Node/pnpm nécessaire côté ami — juste
-  l'exe. Le cache vit dans le dossier de données de l'app
+  cache depuis la branche
+  [`builds`](https://github.com/lemonnv39/abyss-cord/tree/builds) de ce
+  repo — alimentée automatiquement par `.github/workflows/publish-dist.yml`
+  à chaque push sur `main`. Aucun clone du repo, aucun Node/pnpm nécessaire
+  côté ami — juste l'exe. Le cache vit dans le dossier de données de l'app
   (`%APPDATA%\cc.abyss.injector\dist\`) et n'est retéléchargé que si absent ou
   via le bouton "Mettre à jour le build Abyss" des Réglages.
 - **Override dev (optionnel)** : si le champ "Dossier du repo Abyss" des
   Réglages est renseigné, l'injecteur utilise
   `<repo>/dist/desktop/patcher.js` à la place — utile pour tester un build
-  local avant qu'il ne soit poussé sur `master`. Nécessite d'avoir buildé
+  local avant qu'il ne soit poussé sur `main`. Nécessite d'avoir buildé
   Abyss au moins une fois (`node scripts/build/build.mjs --disable-updater`).
 
 Donc oui : `pnpm tauri build` produit un `.exe` autonome que tu peux

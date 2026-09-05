@@ -1,14 +1,24 @@
-name: Publish dist to abyss-builds
+name: Publish dist to the builds branch
+
+# Pousse le build (patcher.js/preload.js/renderer.js/renderer.css) sur une
+# branche dédiée ("builds") DU MÊME repo, plutôt que vers un repo externe —
+# ça évite toute clé de déploiement : le GITHUB_TOKEN par défaut a déjà les
+# droits d'écriture sur ce repo (voir `permissions` ci-dessous). L'injecteur
+# (injector/src-tauri/src/dist_fetch.rs) lit ensuite ces 4 fichiers via
+# raw.githubusercontent.com/lemonnv39/abyss-cord/builds/.
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "src/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/publish-dist.yml"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-publish:
@@ -28,24 +38,28 @@ jobs:
       - name: Build (standalone, updater interne désactivé)
         run: node --require=./scripts/suppressExperimentalWarnings.js scripts/build/build.mjs --standalone --disable-updater
 
-      - name: Setup deploy key
+      - name: Publier la dist sur la branche builds
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.ABYSS_BUILDS_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+          mkdir -p /tmp/dist-out
+          cp dist/desktop/patcher.js dist/desktop/preload.js dist/desktop/renderer.js dist/desktop/renderer.css /tmp/dist-out/
 
-      - name: Publier la dist vers abyss-builds
-        run: |
-          git clone git@github.com:0ctane6/abyss-builds.git out
-          cp dist/desktop/patcher.js dist/desktop/preload.js dist/desktop/renderer.js dist/desktop/renderer.css out/
-          cd out
           git config user.name "abyss-ci"
           git config user.email "ci@abyss.local"
-          git add -A
+
+          git fetch origin builds:builds || true
+          if git show-ref --verify --quiet refs/heads/builds; then
+            git checkout builds
+          else
+            git checkout --orphan builds
+            git rm -rf . > /dev/null 2>&1 || true
+          fi
+
+          cp /tmp/dist-out/* .
+          git add patcher.js preload.js renderer.js renderer.css
+
           if git diff --cached --quiet; then
             echo "Dist inchangée, rien à publier."
           else
-            git commit -m "Build dist depuis abyss@${GITHUB_SHA::7}"
-            git push
+            git commit -m "Build dist depuis abyss-cord@${GITHUB_SHA::7}"
+            git push origin builds
           fi
