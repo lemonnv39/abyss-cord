@@ -35,6 +35,9 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   channel that downloads the latest `patcher.js` etc. from this repo's
   `builds` branch, so it can be shared with people who have neither this
   repo nor Node installed. See `injector/README.md`.
+- `SmoothType` plugin, ported from Nightcord: replaces the chat input's
+  blinking caret with a synthetic one that glides smoothly between
+  positions (configurable duration, easing curve, color).
 
 ### Fixed
 - The "Abyss has been updated! Restart" banner looping forever on every
