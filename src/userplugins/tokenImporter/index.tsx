@@ -8,13 +8,14 @@ import "./styles.css";
 
 import { DataStore } from "@api/index";
 import { HeaderBarButton } from "@api/HeaderBar";
+import { CopyIcon, DeleteIcon, FolderIcon, OpenExternalIcon, ShieldIcon } from "@components/Icons";
 import { copyToClipboard } from "@utils/clipboard";
 import { classNameFactory } from "@utils/css";
-import { openModal } from "@utils/modal";
+import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin, { PluginNative } from "@utils/types";
 import { RenderModalProps } from "@vencord/discord-types";
 import { findByProps } from "@webpack";
-import { Button, Forms, IconUtils, Modal, React, TabBar, Toasts, useEffect, useState } from "@webpack/common";
+import { Button, Forms, IconUtils, React, TabBar, Toasts, useEffect, useState } from "@webpack/common";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TokenImporter — ajoute/bascule entre TES PROPRES comptes Discord via un token
@@ -250,7 +251,7 @@ function LocalInstallsTab() {
                                     Toasts.show({ message: "Script copié — colle-le dans la console de " + target.label, type: Toasts.Type.SUCCESS, id: Toasts.genId() });
                                 }}
                             >
-                                <CopyIcon />
+                                <CopyIcon width={17} height={17} />
                             </button>
                         </div>
                     </div>
@@ -267,45 +268,22 @@ function avatarUrl(a: { id: string; avatar: string; discriminator: string; }): s
     return IconUtils.getDefaultAvatarURL(a.id, a.discriminator);
 }
 
-function FolderIcon(props: { width?: number; height?: number; }) {
-    return (
-        <svg width={props.width ?? 20} height={props.height ?? 20} viewBox="0 0 24 24" fill="currentColor">
-            <path d="M2 5a3 3 0 0 1 3-3h3.93a2 2 0 0 1 1.66.9L12 5h7a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5Z" />
-        </svg>
-    );
-}
-function TrashIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.1l-.9 12.1A3 3 0 0 1 17 23H7a3 3 0 0 1-3-2.9L3.1 8H2a1 1 0 0 1 0-2h4V4Zm2 0v2h6V4H9Z" />
-        </svg>
-    );
-}
-function CopyIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1Zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2Zm0 16H8V7h11v14Z" />
-        </svg>
-    );
-}
+// Petits badges de statut (rond coloré + glyphe blanc), pour la liste de
+// résultats de vérification — plus lisible qu'une icône colorée flottant nue
+// à côté du texte.
 function CheckIcon() {
     return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" />
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="9" fill="var(--status-positive-background, var(--text-positive))" />
+            <path d="M5 9.2l2.4 2.4L13 6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
 }
 function CrossIcon() {
     return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12Z" />
-        </svg>
-    );
-}
-function OpenWindowIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7ZM5 5h6V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6h-2v6H5V5Z" />
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="9" fill="var(--status-danger-background, var(--text-danger))" />
+            <path d="M6 6l6 6M12 6l-6 6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
 }
@@ -348,7 +326,7 @@ function SavedAccountsTab({ accounts, loaded, onRemove }: {
                 className={cl("my-token-btn")}
                 onClick={copyMyToken}
             >
-                <CopyIcon /> Copier mon token actuel
+                <CopyIcon width={16} height={16} /> Copier mon token actuel
             </Button>
 
             {!loaded ? (
@@ -364,23 +342,23 @@ function SavedAccountsTab({ accounts, loaded, onRemove }: {
                                 <span className={cl("username")}>
                                     {a.username}{a.discriminator && a.discriminator !== "0" ? `#${a.discriminator}` : ""}
                                 </span>
-                                <span className={cl("token-hidden")}>••••••••••••••••••••</span>
+                                <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>
                             </div>
                             <div className={cl("row-actions")}>
                                 <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => switchToAccount(a.token)}>
                                     Basculer
                                 </Button>
                                 <button className={cl("icon-btn")} title="Ouvrir dans une nouvelle fenêtre" onClick={() => openInStandaloneInstance(a)}>
-                                    <OpenWindowIcon />
+                                    <OpenExternalIcon width={17} height={17} />
                                 </button>
                                 <button className={cl("icon-btn")} title="Copier le token" onClick={() => {
                                     copyToClipboard(a.token);
                                     Toasts.show({ message: "Token copié", type: Toasts.Type.SUCCESS, id: Toasts.genId() });
                                 }}>
-                                    <CopyIcon />
+                                    <CopyIcon width={17} height={17} />
                                 </button>
                                 <button className={cl("icon-btn", "icon-btn--danger")} title="Supprimer" onClick={() => onRemove(a.id)}>
-                                    <TrashIcon />
+                                    <DeleteIcon width={17} height={17} />
                                 </button>
                             </div>
                         </div>
@@ -492,12 +470,18 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
     }
 
     return (
-        <Modal
-            {...modalProps}
-            size="md"
-            title="Token Importer"
-            subtitle="Ajoute ou bascule entre tes comptes via un token que tu possèdes déjà"
-        >
+        <ModalRoot {...modalProps} size="large" className={cl("root")}>
+            <ModalHeader separator={false} className={cl("header")}>
+                <div className={cl("header-icon")}><ShieldIcon width={20} height={20} /></div>
+                <div className={cl("header-text")}>
+                    <Forms.FormTitle tag="h4" className={cl("title")}>Token Importer</Forms.FormTitle>
+                    <Forms.FormText className={cl("subtitle")}>
+                        Ajoute ou bascule entre tes comptes via un token que tu possèdes déjà
+                    </Forms.FormText>
+                </div>
+                <ModalCloseButton onClick={modalProps.onClose} />
+            </ModalHeader>
+
             <TabBar
                 type="top"
                 look="brand"
@@ -516,17 +500,19 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
                 </TabBar.Item>
             </TabBar>
 
-            {tab === Tab.Saved && <SavedAccountsTab accounts={accounts} loaded={loaded} onRemove={removeAccount} />}
-            {tab === Tab.Add && <AddTokenTab onAdded={setAccounts} />}
-            {tab === Tab.Local && <LocalInstallsTab />}
-        </Modal>
+            <ModalContent className={cl("content")}>
+                {tab === Tab.Saved && <SavedAccountsTab accounts={accounts} loaded={loaded} onRemove={removeAccount} />}
+                {tab === Tab.Add && <AddTokenTab onAdded={setAccounts} />}
+                {tab === Tab.Local && <LocalInstallsTab />}
+            </ModalContent>
+        </ModalRoot>
     );
 }
 
 function TokenImporterHeaderButton() {
     return (
         <HeaderBarButton
-            icon={() => <FolderIcon />}
+            icon={FolderIcon}
             tooltip="Token Importer"
             onClick={() => openModal(props => <TokenImporterModal modalProps={props} />)}
         />

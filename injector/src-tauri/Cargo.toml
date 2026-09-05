@@ -1,0 +1,32 @@
+[package]
+name = "abyss-injector"
+version = "0.1.0"
+description = "Injecteur/patcheur pour Abyss (fork Vencord/Equicord) — projet Tauri indépendant"
+authors = ["lemonn"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Pour tuer le process Discord avant patch/unpatch (fichiers relâchés), sans
+# FFI Win32 manuel — contrairement au Go original qui fait ça à la main via
+# CreateToolhelp32Snapshot.
+sysinfo = "0.32"
+# Télécharge le build JS d'Abyss depuis abyss-builds (voir dist_fetch.rs).
+# Features par défaut = native-tls -> Schannel sur Windows, donc aucune
+# dépendance native supplémentaire (pas d'OpenSSL/NASM à installer en plus
+# des Build Tools C++ déjà nécessaires pour compiler Tauri).
+reqwest = { version = "0.12", features = ["json"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

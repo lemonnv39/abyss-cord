@@ -28,6 +28,7 @@ import { isAnyPluginDev } from "@utils/misc";
 import { relaunch } from "@utils/native";
 import { Alerts, GuildMemberStore, React, UserStore } from "@webpack/common";
 
+import { InterfaceLanguageSettings } from "./InterfaceLanguageSettings";
 import { MacOSVibrancySettings } from "./MacVibrancySettings";
 import { NotificationSection } from "./NotificationSettings";
 import { WindowsMaterialSettings } from "./WindowsMaterialSettings";
@@ -43,7 +44,7 @@ type KeysOfType<Object, Type> = {
 }[keyof Object];
 
 function Switches() {
-    const settings = useSettings(["useQuickCss", "enableReactDevtools", "mainWindowFrameless", "frameless", "winNativeTitleBar", "transparent", "winCtrlQ", "disableMinSize", "performanceMode", "maxPerformance", "reduceBackgroundActivity"]);
+    const settings = useSettings(["useQuickCss", "enableReactDevtools", "mainWindowFrameless", "frameless", "winNativeTitleBar", "transparent", "winCtrlQ", "disableMinSize", "performanceMode", "maxPerformance", "uncapFrameRate", "reduceBackgroundActivity"]);
 
     const Switches = [
         {
@@ -106,10 +107,17 @@ function Switches() {
         },
         !IS_WEB && {
             key: "maxPerformance",
-            title: "Max Performance (Unlimited FPS)",
-            description: "Uncaps the frame rate and ignores the GPU blocklist for extra-smooth motion on high-refresh displays. Uses more GPU. Requires Performance Mode.",
+            title: "Max Performance",
+            description: "Ignores the GPU blocklist and uncaps Chromium's internal frame rate limit for a snappier UI. Uses more GPU. Requires Performance Mode.",
             restartRequired: true,
             warning: "Forcing GPU acceleration on an unsupported/blocklisted GPU can cause rendering glitches or crashes. Disable this first if the app misbehaves after enabling it.",
+        },
+        !IS_WEB && {
+            key: "uncapFrameRate",
+            title: "Uncap Frame Rate (disables VSync)",
+            description: "Decouples rendering from your display's refresh rate for extra-smooth motion on high-refresh monitors. Separate from Max Performance because it can make video and GIF playback stutter — video has a fixed frame rate, so VSync is normally what keeps it smooth.",
+            restartRequired: true,
+            warning: "Videos and GIFs may stutter or judder while this is on. Disable it first if playback looks broken.",
         },
         !IS_WEB && {
             key: "reduceBackgroundActivity",
@@ -258,6 +266,9 @@ function EquicordSettings() {
 
             <MacOSVibrancySettings />
             <WindowsMaterialSettings />
+
+            <Divider className={Margins.top20} />
+            <InterfaceLanguageSettings />
 
             <NotificationSection />
         </SettingsTab >

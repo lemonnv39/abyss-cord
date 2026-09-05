@@ -4,9 +4,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { app, BrowserWindow, session } from "electron";
-import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from "fs";
+import { app, BrowserWindow, ipcMain, session } from "electron";
+import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
+
+// Bundled at build time as base64 by the `file://` loader (scripts/build/
+// common.mjs's fileUrlPlugin) — no extra asset-copy step needed, unlike
+// Nightcord's original version which relied on a separate collect-assets.mjs
+// script to place loose .ico files next to the exe after every build.
+import icon1 from "file://./icons/1.ico?base64";
+import icon2 from "file://./icons/2.ico?base64";
+import icon3 from "file://./icons/3.ico?base64";
 
 // MultiInstance — opens an account already saved in TokenImporter in its own
 // Discord window, with its own session (persist:abyss-mi-{userId}).
@@ -20,6 +28,106 @@ const openWindows = new Map<string, BrowserWindow>();
 const activePreloads = new Set<string>();
 
 const VALID_DOMAINS = new Set(["discord.com", "ptb.discord.com", "canary.discord.com"]);
+
+// Rotates red → black → green → red... across successive detached instances,
+// so each one is visually distinct from the main window (Discord's blue,
+// Canary's yellow) AND from each other on the Windows taskbar — ported from
+// Nightcord's multiInstance plugin, which does the exact same rotation.
+const INSTANCE_ICONS = [icon1, icon2, icon3];
+let iconCounter = 0;
+
+// Windows derives the TASKBAR button's icon from the window's AppUserModelID
+// registration (setAppDetails' appIconPath below), not from BrowserWindow's
+// `icon` option alone — that one only covers the window's own title-bar/
+// Alt-Tab icon. appIconPath needs a real file on disk, so the bundled base64
+// gets written out once per icon, on first use, into userData.
+const iconFilePaths = new Map<number, string>();
+
+function instanceIconDir(): string {
+    const dir = join(app.getPath("userData"), "abyss-mi-icons");
+    mkdirSync(dir, { recursive: true });
+    return dir;
+}
+
+function nextInstanceIconPath(): string | undefined {
+    try {
+        const index = iconCounter % INSTANCE_ICONS.length;
+        iconCounter++;
+
+        let filePath = iconFilePaths.get(index);
+        if (!filePath || !existsSync(filePath)) {
+            filePath = join(instanceIconDir(), `${index}.ico`);
+            writeFileSync(filePath, Buffer.from(INSTANCE_ICONS[index], "base64"));
+            iconFilePaths.set(index, filePath);
+        }
+        return filePath;
+    } catch {
+        return undefined;
+    }
+}
+
+// Discord's own in-page titlebar (the min/maximize/close buttons Discord
+// draws itself once frame:false hides the OS ones) controls the window via
+// ipcRenderer.invoke("DISCORD_WINDOW_CLOSE" | "..._MINIMIZE" | "..._MAXIMIZE"
+// | "..._RESTORE"), which Discord's core handles with a GLOBAL ipcMain
+// handler that always resolves to the main window — click close on a
+// detached instance and it closes the main Discord/Canary window instead.
+// webContents.ipc.handle registers a handler local to just this sender,
+// which Electron prioritizes over the global ipcMain one — so we intercept
+// these same channels per-window and point them at `win` instead. Ported
+// from Nightcord's multiInstance plugin, which hit and fixed this exact bug.
+function registerWindowControlIpc(win: BrowserWindow): () => void {
+    const wc = win.webContents as any; // webContents.ipc: Electron 20+
+
+    const CLOSE = "DISCORD_WINDOW_CLOSE";
+    const MINIMIZE = "DISCORD_WINDOW_MINIMIZE";
+    const MAXIMIZE = "DISCORD_WINDOW_MAXIMIZE";
+    const RESTORE = "DISCORD_WINDOW_RESTORE";
+
+    const handleClose = () => { if (!win.isDestroyed()) win.close(); };
+    const handleMinimize = () => { if (!win.isDestroyed()) win.minimize(); };
+    const handleMaximize = () => {
+        if (win.isDestroyed()) return;
+        if (win.isMaximized()) win.unmaximize(); else win.maximize();
+    };
+    const handleRestore = () => { if (!win.isDestroyed()) win.restore(); };
+
+    try {
+        wc.ipc.handle(CLOSE, handleClose);
+        wc.ipc.handle(MINIMIZE, handleMinimize);
+        wc.ipc.handle(MAXIMIZE, handleMaximize);
+        wc.ipc.handle(RESTORE, handleRestore);
+        return () => {
+            try {
+                wc.ipc.removeHandler(CLOSE);
+                wc.ipc.removeHandler(MINIMIZE);
+                wc.ipc.removeHandler(MAXIMIZE);
+                wc.ipc.removeHandler(RESTORE);
+            } catch { }
+        };
+    } catch {
+        // Fallback for older Electron without webContents.ipc: a guarded
+        // global handler that no-ops unless the sender is THIS window.
+        const guarded = (fn: () => void) => (event: Electron.IpcMainInvokeEvent) => {
+            if (BrowserWindow.fromWebContents(event.sender) !== win) return;
+            fn();
+        };
+        try { ipcMain.removeHandler(CLOSE); } catch { }
+        try { ipcMain.removeHandler(MINIMIZE); } catch { }
+        try { ipcMain.removeHandler(MAXIMIZE); } catch { }
+        try { ipcMain.removeHandler(RESTORE); } catch { }
+        ipcMain.handle(CLOSE, guarded(handleClose));
+        ipcMain.handle(MINIMIZE, guarded(handleMinimize));
+        ipcMain.handle(MAXIMIZE, guarded(handleMaximize));
+        ipcMain.handle(RESTORE, guarded(handleRestore));
+        return () => {
+            ipcMain.removeHandler(CLOSE);
+            ipcMain.removeHandler(MINIMIZE);
+            ipcMain.removeHandler(MAXIMIZE);
+            ipcMain.removeHandler(RESTORE);
+        };
+    }
+}
 
 function preloadDir(): string {
     const dir = join(app.getPath("userData"), "abyss-mi-preloads");
@@ -131,6 +239,14 @@ export async function openInstanceWindow(
         // it now, restore it right after construction.
         const realDiscordPreload = process.env.DISCORD_PRELOAD;
 
+        // Windows groups taskbar buttons by AppUserModelID, which normally
+        // defaults to the running exe's — a plain new window would look like
+        // just another Discord/Canary window under the same group and icon.
+        // A unique id per window (set via setAppDetails below, right after
+        // construction) keeps it fully separate.
+        const uniqueAppId = `abyss.instance.${userId}.${Date.now()}`;
+        const instanceIconPath = nextInstanceIconPath();
+
         const win = new BrowserWindow({
             width: 1280,
             height: 800,
@@ -139,6 +255,13 @@ export async function openInstanceWindow(
             autoHideMenuBar: true,
             backgroundColor: "#313338",
             title: `Discord [${username || userId}]`,
+            // Discord draws its own title bar/window controls in-page — a
+            // framed window on top of that doubled up the window chrome
+            // (native OS titlebar + Discord's own). frame:false leaves only
+            // Discord's own, same as Abyss's main window.
+            frame: false,
+            titleBarStyle: "hidden",
+            icon: instanceIconPath,
             webPreferences: {
                 session: ses,
                 contextIsolation: true,
@@ -161,12 +284,31 @@ export async function openInstanceWindow(
 
         if (realDiscordPreload !== undefined) process.env.DISCORD_PRELOAD = realDiscordPreload;
 
+        // Must run immediately after construction, before the window shows —
+        // this is what stops Windows from grouping it with the main process.
+        if (process.platform === "win32") {
+            try {
+                win.setAppDetails({
+                    appId: uniqueAppId,
+                    appIconPath: instanceIconPath,
+                    relaunchDisplayName: `Discord [${username || userId}]`,
+                });
+            } catch (e) {
+                console.warn("[MultiInstance] setAppDetails failed:", e);
+            }
+        }
+
         openWindows.set(userId, win);
+
+        // Registered now, before Discord's own JS loads (dom-ready), so its
+        // window-control buttons hit this instance's handler from the start.
+        const cleanupWindowControlIpc = registerWindowControlIpc(win);
 
         win.once("closed", () => {
             openWindows.delete(userId);
             activePreloads.delete(preloadPath);
             try { unlinkSync(preloadPath); } catch { }
+            cleanupWindowControlIpc();
             // Stop this session's service workers so push notifications end
             // once the instance is closed.
             ses.clearStorageData({ storages: ["serviceworkers"] }).catch(() => { });

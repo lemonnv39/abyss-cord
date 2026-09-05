@@ -421,10 +421,10 @@ export default function PluginSettings() {
                             { label: "Show All", value: SearchStatus.ALL, default: true },
                             { label: "Show Enabled", value: SearchStatus.ENABLED },
                             { label: "Show Disabled", value: SearchStatus.DISABLED },
-                            { label: "Show Abyss", value: SearchStatus.EQUICORD },
+                            { label: "Show Equicord", value: SearchStatus.EQUICORD },
                             { label: "Show Vencord", value: SearchStatus.VENCORD },
                             { label: "Show New", value: SearchStatus.NEW },
-                            hasUserPlugins && { label: "Show UserPlugins", value: SearchStatus.USER_PLUGINS },
+                            hasUserPlugins && { label: "Show Abyss", value: SearchStatus.USER_PLUGINS },
                             { label: "Show API Plugins", value: SearchStatus.API_PLUGINS },
                         ].filter(isTruthy)}
                         serialize={String}

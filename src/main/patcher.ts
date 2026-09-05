@@ -197,8 +197,18 @@ if (!IS_VANILLA) {
 
         if (settings.maxPerformance) {
             app.commandLine.appendSwitch("ignore-gpu-blocklist");
-            app.commandLine.appendSwitch("disable-gpu-vsync");
             app.commandLine.appendSwitch("disable-frame-rate-limit");
+        }
+
+        // disable-gpu-vsync used to be part of Max Performance, but it
+        // decouples frame presentation from the display's refresh rate —
+        // video/GIF content has a fixed frame rate, so vsync is what makes
+        // it render smoothly in the first place. Split out as its own
+        // opt-in so people who explicitly want an uncapped compositor (e.g.
+        // for a high-refresh monitor) can still have it, without it being
+        // silently bundled into Max Performance and breaking video playback.
+        if (settings.uncapFrameRate) {
+            app.commandLine.appendSwitch("disable-gpu-vsync");
         }
     }
 } else {

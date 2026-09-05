@@ -4,22 +4,69 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+.vc-tokenimporter-root {
+    overflow-x: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.vc-tokenimporter-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px 24px 16px;
+}
+
+.vc-tokenimporter-header-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--brand-500), var(--brand-560, var(--brand-500)));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(88, 101, 242, 0.35);
+}
+
+.vc-tokenimporter-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.vc-tokenimporter-title {
+    margin: 0 !important;
+    font-size: 18px !important;
+}
+
+.vc-tokenimporter-subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-top: 2px;
+}
+
+/* ── Tab bar ────────────────────────────────────────────────────────────── */
+
 .vc-tokenimporter-tab-bar {
     border-bottom: 1px solid var(--border-subtle);
-    margin: 16px 16px 0;
+    margin: 0 24px;
     display: flex;
     align-items: stretch;
     flex-direction: row;
-    gap: 8px;
+    gap: 20px;
+    flex-wrap: wrap;
 }
 
 .vc-tokenimporter-tab {
     border-bottom: 2px solid transparent;
     color: var(--interactive-normal);
     cursor: pointer;
-    padding: 8px 4px;
+    padding: 10px 2px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .vc-tokenimporter-tab:where(.vc-tokenimporter-selected, :hover, :focus) {
@@ -27,59 +74,79 @@
     border-bottom-color: var(--brand-500);
 }
 
+/* ── Content ────────────────────────────────────────────────────────────── */
+
+.vc-tokenimporter-content {
+    padding: 0 24px 24px !important;
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
 .vc-tokenimporter-tab-content {
-    padding: 16px;
+    padding: 20px 0 0;
+    min-width: 0;
 }
 
 .vc-tokenimporter-empty {
     color: var(--text-muted);
-    padding: 24px 0;
+    padding: 40px 0;
     text-align: center;
 }
 
 .vc-tokenimporter-my-token-btn {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
+
+/* ── Account / install rows ─────────────────────────────────────────────── */
 
 .vc-tokenimporter-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+    min-width: 0;
 }
 
 .vc-tokenimporter-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border-radius: 8px;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--background-secondary);
+    border: 1px solid transparent;
+    min-width: 0;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .vc-tokenimporter-row:hover {
     background: var(--background-modifier-hover);
+    border-color: var(--border-subtle);
 }
 
 .vc-tokenimporter-avatar {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--background-secondary);
 }
 
 .vc-tokenimporter-row-info {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     display: flex;
     flex-direction: column;
+    gap: 1px;
 }
 
 .vc-tokenimporter-username {
     color: var(--header-primary);
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -87,14 +154,17 @@
 
 .vc-tokenimporter-token-hidden {
     color: var(--text-muted);
-    font-family: var(--font-code);
     font-size: 12px;
+    letter-spacing: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vc-tokenimporter-row-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
 }
 
@@ -103,48 +173,59 @@
     border: none;
     color: var(--interactive-normal);
     cursor: pointer;
-    padding: 6px;
-    border-radius: 4px;
+    padding: 7px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
+    transition: color 0.12s ease, background 0.12s ease, transform 0.12s ease;
 }
 
 .vc-tokenimporter-icon-btn:hover {
     color: var(--interactive-hover);
     background: var(--background-modifier-selected);
+    transform: translateY(-1px);
 }
 
 .vc-tokenimporter-icon-btn--danger:hover {
     color: var(--text-danger);
 }
 
+/* ── "Ajouter un token" ─────────────────────────────────────────────────── */
+
 .vc-tokenimporter-hint {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    color: var(--text-muted);
 }
 
 .vc-tokenimporter-textarea {
     width: 100%;
-    min-height: 100px;
+    min-height: 110px;
+    max-width: 100%;
+    box-sizing: border-box;
     background: var(--input-background);
     color: var(--text-normal);
     border: 1px solid var(--background-modifier-accent);
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 10px;
+    padding: 12px;
     font-family: var(--font-code);
     font-size: 13px;
     resize: vertical;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .vc-tokenimporter-textarea:focus {
     outline: none;
     border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
 }
 
 .vc-tokenimporter-add-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .vc-tokenimporter-detected {
@@ -153,10 +234,10 @@
 }
 
 .vc-tokenimporter-results {
-    margin-top: 14px;
+    margin-top: 16px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .vc-tokenimporter-result-row {
@@ -164,6 +245,9 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--background-secondary);
 }
 
 .vc-tokenimporter-result-row--valid {

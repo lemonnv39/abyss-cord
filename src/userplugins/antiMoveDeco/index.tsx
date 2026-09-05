@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { UserAreaButton } from "@api/UserArea";
+import { HeaderBarButton } from "@api/HeaderBar";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { FluxDispatcher, React, UserStore } from "@webpack/common";
+import { FluxDispatcher, React, Toasts, UserStore } from "@webpack/common";
 
 const ChannelActions = findByPropsLazy("selectVoiceChannel", "disconnect");
 const SelectedChannelStore = findByPropsLazy("getVoiceChannelId", "getChannelId");
@@ -32,10 +32,10 @@ function onVoiceStateUpdate({ voiceStates }: { voiceStates: any[]; }) {
     }
 }
 
-function AntiMoveDecoIcon({ enabled }: { enabled: boolean; }) {
+function AntiMoveDecoIcon({ enabled, width = 20, height = 20 }: { enabled: boolean; width?: number; height?: number; }) {
     const color = enabled ? "#39FF14" : "currentColor";
     return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width={width} height={height} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2.5" />
             <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke={color} strokeWidth="2.5" />
         </svg>
@@ -48,7 +48,10 @@ function AntiMoveDecoButton() {
     const toggle = () => {
         if (!enabled) {
             const channelId = SelectedChannelStore?.getVoiceChannelId?.();
-            if (!channelId) return;
+            if (!channelId) {
+                Toasts.show(Toasts.create("Join a voice channel first", Toasts.Type.FAILURE));
+                return;
+            }
             targetChannelId = channelId;
             enabled = true;
         } else {
@@ -59,10 +62,11 @@ function AntiMoveDecoButton() {
     };
 
     return (
-        <UserAreaButton
+        <HeaderBarButton
+            icon={props => <AntiMoveDecoIcon enabled={enabled} {...props} />}
+            tooltip={enabled ? "AntiMove & Deco: ON — click to disable" : "AntiMove & Deco: OFF — click to enable"}
+            selected={enabled}
             onClick={toggle}
-            tooltipText={enabled ? "Disable AntiMove & Deco" : "Enable AntiMove & Deco"}
-            icon={<AntiMoveDecoIcon enabled={enabled} />}
         />
     );
 }
@@ -72,11 +76,11 @@ export default definePlugin({
     enabledByDefault: false,
     description: "Adds a button that snaps you back into your current voice channel if you get moved or disconnected from it.",
     authors: [{ name: "0ctane", id: 0n }],
-    dependencies: ["UserAreaAPI"],
 
-    userAreaButton: {
+    headerBarButton: {
         icon: () => <AntiMoveDecoIcon enabled={enabled} />,
-        render: AntiMoveDecoButton
+        render: AntiMoveDecoButton,
+        priority: 3
     },
 
     start() {

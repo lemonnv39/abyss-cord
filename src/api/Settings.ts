@@ -75,7 +75,9 @@ export interface Settings {
     winNativeTitleBar: boolean;
     performanceMode: boolean;
     maxPerformance: boolean;
+    uncapFrameRate: boolean;
     reduceBackgroundActivity: boolean;
+    interfaceLanguage: "en" | "fr";
     plugins: {
         [plugin: string]: {
             enabled: boolean;
@@ -135,7 +137,9 @@ const DefaultSettings: Settings = {
     winNativeTitleBar: false,
     performanceMode: false,
     maxPerformance: false,
+    uncapFrameRate: false,
     reduceBackgroundActivity: false,
+    interfaceLanguage: "en",
     plugins: {},
 
     uiElements: {

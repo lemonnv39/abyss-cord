@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { margin: 0; padding: 12px; background: transparent; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; -webkit-app-region: no-drag; }
+* { -webkit-app-region: no-drag; }
+#drag-header { -webkit-app-region: drag; }
+.wbh-overlay {
+    position: relative;
+    background: #242528;
+    color: #dbdee1;
+    border-radius: 12px;
+    padding: 16px;
+    width: 300px;
+    box-sizing: border-box;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    user-select: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.wbh-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    width: calc(100% - 30px);
+    cursor: grab;
+}
+.wbh-header h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.wbh-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    cursor: pointer;
+    color: #b5bac1;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 10px;
+    z-index: 99999;
+    -webkit-app-region: no-drag;
+}
+.wbh-close:hover {
+    color: #dbdee1;
+    background: rgba(78, 80, 88, 0.16);
+}
+.wbh-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.wbh-input-row {
+    display: flex;
+    gap: 8px;
+}
+.wbh-input {
+    flex: 1;
+    background: #1e1f22;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #dbdee1;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+}
+.wbh-input:focus {
+    border-color: #7c3aed;
+}
+.wbh-button {
+    background: #7c3aed;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.wbh-button:hover { background: #6d28d9; }
+.wbh-button:active { background: #5b21b6; }
+.wbh-status {
+    font-size: 11px;
+    color: #949ba4;
+    font-weight: 500;
+}
+.wbh-alphabet {
+    display: grid;
+    grid-template-columns: repeat(13, 1fr);
+    gap: 4px;
+    text-align: center;
+}
+.wbh-letter {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 0;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #a78bfa;
+}
+
+.wbh-range-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.wbh-range-container label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #949ba4;
+    text-transform: uppercase;
+}
+.wbh-range-val {
+    color: #dbdee1;
+    font-weight: 700;
+    float: right;
+}
+.wbh-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #1e1f22;
+    outline: none;
+    margin: 4px 0;
+}
+.wbh-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #7c3aed;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.wbh-settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.wbh-settings-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.wbh-settings-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+}
+.wbh-settings-sublabel {
+    font-size: 10px;
+    color: #949ba4;
+}
+.wbh-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    cursor: pointer;
+}
+.wbh-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.wbh-switch-slider {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #80848e;
+    transition: .15s ease;
+    border-radius: 10px;
+}
+.wbh-switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .15s ease;
+    border-radius: 50%;
+}
+input:checked + .wbh-switch-slider { background-color: #23a55a; }
+input:checked + .wbh-switch-slider:before { transform: translateX(16px); }
+
+.wbh-select-custom { position: relative; width: 100%; }
+.wbh-select-trigger {
+    background: #1e1f22;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #dbdee1;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+.wbh-select-trigger:hover { border-color: rgba(255, 255, 255, 0.16); }
+.wbh-select-dropdown {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0; right: 0;
+    background: #1e1f22;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+    z-index: 10000;
+    overflow: hidden;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-sizing: border-box;
+}
+.wbh-select-option {
+    padding: 6px 10px;
+    color: #b5bac1;
+    font-size: 13px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    box-sizing: border-box;
+}
+.wbh-select-option:hover { background: rgba(78, 80, 88, 0.16); color: #dbdee1; }
+.wbh-select-option.selected { background: #7c3aed; color: #ffffff; }
+
+.wbh-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    -webkit-app-region: no-drag;
+}
+.wbh-settings-btn {
+    cursor: pointer;
+    color: #b5bac1;
+    font-size: 14px;
+    transition: color 0.15s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+}
+.wbh-settings-btn:hover { color: #dbdee1; transform: rotate(30deg); }
+.wbh-status-footer { font-size: 10px; color: #949ba4; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wbh-overlay">
+    <div class="wbh-close" id="btn-close">✕</div>
+    <div class="wbh-header" id="drag-header">
+        <h3>🎯 WordBomb Helper</h3>
+    </div>
+
+    <!-- Home View -->
+    <div class="wbh-content" id="view-home">
+        <div class="wbh-alphabet" id="alphabet-grid"></div>
+        <div class="wbh-input-row">
+            <input type="text" class="wbh-input" id="syllable" placeholder="Enter Syllable..." autofocus autocomplete="off" spellcheck="false" />
+            <button class="wbh-button" id="btn-find">FIND</button>
+        </div>
+        <div class="wbh-status" id="status">Loading dictionary...</div>
+    </div>
+
+    <!-- Settings View -->
+    <div class="wbh-content" id="view-settings" style="display: none;">
+        <div class="wbh-range-container">
+            <label>Speed (LPS) <span class="wbh-range-val" id="val-lps">50</span></label>
+            <input type="range" min="10" max="100" step="1" class="wbh-slider" id="slide-lps" />
+        </div>
+        <div class="wbh-range-container">
+            <label>Typo Chance <span class="wbh-range-val" id="val-error">0%</span></label>
+            <input type="range" min="0" max="100" step="1" class="wbh-slider" id="slide-error" />
+        </div>
+        <div class="wbh-range-container">
+            <label>Theme (Optional)</label>
+            <input type="text" class="wbh-input" id="input-theme" placeholder="e.g. tech, nature..." />
+        </div>
+        <div class="wbh-range-container" style="margin-bottom: 12px;">
+            <label>Play Style</label>
+            <div class="wbh-select-custom" id="select-playmode">
+                <div class="wbh-select-trigger" id="playmode-trigger">
+                    <span id="playmode-label">Normal</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 10l5 5 5-5H7z"/>
+                    </svg>
+                </div>
+                <div class="wbh-select-dropdown" id="playmode-dropdown" style="display: none;">
+                    <div class="wbh-select-option" data-value="Normal">Normal</div>
+                    <div class="wbh-select-option" data-value="Pro">Pro Mod (Long &amp; Complex)</div>
+                    <div class="wbh-select-option" data-value="Noob">Noob Mod (Short &amp; Simple)</div>
+                </div>
+            </div>
+        </div>
+        <div class="wbh-settings-row" style="margin-bottom: 12px;">
+            <div class="wbh-settings-info">
+                <span class="wbh-settings-label">No Spaces or Dashes</span>
+                <span class="wbh-settings-sublabel">Do not type words with spaces/dashes</span>
+            </div>
+            <label class="wbh-switch">
+                <input type="checkbox" id="chk-nospace" />
+                <span class="wbh-switch-slider"></span>
+            </label>
+        </div>
+        <button class="wbh-button" id="btn-back" style="width: 100%;">BACK</button>
+    </div>
+
+    <!-- Footer -->
+    <div class="wbh-footer">
+        <div class="wbh-settings-btn" id="btn-settings">⚙</div>
+        <div class="wbh-status-footer" id="status-footer">LPS: 50 | Typo: 0%</div>
+    </div>
+</div>
+
+<script>
+    // __DICTIONARY_PLACEHOLDER__ is replaced with a real JSON array by
+    // native.ts before this page loads — our local an-array-of-french-words
+    // subset (see words.json), so the panel works instantly offline. The
+    // live fetch below (same public source Nightcord used) merges in more
+    // words when the network is available, same as their version, but
+    // without depending on it to be usable at all.
+    let dictionary = __DICTIONARY_PLACEHOLDER__;
+    let history = [];
+    let badWords = new Set();
+    let themeWords = new Set();
+
+    const loadSetting = (key, def) => {
+        try {
+            const val = localStorage.getItem(key);
+            if (val !== null) return val;
+        } catch {}
+        return def;
+    };
+    const saveSetting = (key, val) => {
+        try { localStorage.setItem(key, String(val)); } catch {}
+    };
+
+    let lps = parseFloat(loadSetting('wbh_lps', '50'));
+    let humanChance = parseInt(loadSetting('wbh_humanChance', '10'));
+    let theme = loadSetting('wbh_theme', '');
+    let playMode = loadSetting('wbh_playMode', 'Normal');
+    let noSpace = loadSetting('wbh_noSpace', 'false') === 'true';
+
+    document.getElementById('status').innerText = "Ready (" + dictionary.length + " words)";
+    document.getElementById('status-footer').innerText = "LPS: " + lps + " | Typo: " + humanChance + "%";
+
+    document.getElementById('slide-lps').value = lps;
+    document.getElementById('val-lps').innerText = lps;
+    document.getElementById('slide-error').value = humanChance;
+    document.getElementById('val-error').innerText = humanChance + "%";
+    document.getElementById('input-theme').value = theme;
+    document.getElementById('chk-nospace').checked = noSpace;
+
+    // Optional live enrichment — same public dictionary source Nightcord
+    // used. Not required: the page already works with the bundled list.
+    fetch("https://raw.githubusercontent.com/words/an-array-of-french-words/master/index.json")
+        .then(r => r.ok ? r.json() : [])
+        .then(extra => {
+            if (Array.isArray(extra) && extra.length > 0) {
+                const merged = new Set(dictionary);
+                let added = 0;
+                for (const w of extra) {
+                    if (typeof w === "string" && /^[a-zàâäéèêëïîôöùûüÿçœæ]+$/i.test(w) && w.length >= 3 && w.length <= 20) {
+                        if (!merged.has(w.toLowerCase())) { merged.add(w.toLowerCase()); added++; }
+                    }
+                }
+                if (added > 0) {
+                    dictionary = Array.from(merged);
+                    document.getElementById('status').innerText = "Ready (" + dictionary.length + " words)";
+                }
+            }
+        })
+        .catch(() => {});
+
+    // Alphabet tracker
+    const FULL_ALPHABET = "abcdefghijklmnopqrstuvwxyz".split("");
+    function renderAlphabet(letters) {
+        const grid = document.getElementById('alphabet-grid');
+        grid.innerHTML = "";
+        for (const l of letters) {
+            const span = document.createElement('span');
+            span.className = 'wbh-letter';
+            span.innerText = l.toUpperCase();
+            grid.appendChild(span);
+        }
+    }
+    renderAlphabet(FULL_ALPHABET);
+    function getMissingAlphabet() {
+        if (history.length === 0) return FULL_ALPHABET;
+        return history[history.length - 1].alphabet;
+    }
+
+    // Theme fetching (Wikipedia)
+    function fetchTheme() {
+        if (theme.trim().length === 0) { themeWords.clear(); return; }
+        fetch("https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=" + encodeURIComponent(theme) + "&utf8=&format=json&srlimit=1")
+            .then(r => r.json())
+            .then(d => {
+                if (d.query && d.query.search && d.query.search[0] && d.query.search[0].pageid) {
+                    const pageId = d.query.search[0].pageid;
+                    return fetch("https://fr.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&pageids=" + pageId + "&format=json");
+                }
+                throw new Error("No page");
+            })
+            .then(r => r.json())
+            .then(d => {
+                const pages = d.query && d.query.pages;
+                if (pages) {
+                    const textObj = Object.values(pages)[0];
+                    if (textObj && textObj.extract) {
+                        themeWords.clear();
+                        const words = textObj.extract.toLowerCase().match(/[a-zàâçéèêëîïôûùüÿñæœ]+/g) || [];
+                        words.forEach(w => { if (w.length > 3) themeWords.add(w); });
+                        if (themeWords.size > 0) {
+                            document.getElementById('status').innerText = "Ready (" + dictionary.length + " words) (+ Theme)";
+                        }
+                    }
+                }
+            }).catch(() => themeWords.clear());
+    }
+    fetchTheme();
+
+    // Settings panel toggle
+    let isSettingsOpen = false;
+    const homeView = document.getElementById('view-home');
+    const settingsView = document.getElementById('view-settings');
+    const btnSettings = document.getElementById('btn-settings');
+
+    function toggleSettings() {
+        isSettingsOpen = !isSettingsOpen;
+        if (isSettingsOpen) {
+            homeView.style.display = 'none';
+            settingsView.style.display = 'flex';
+            btnSettings.innerText = '✕';
+        } else {
+            settingsView.style.display = 'none';
+            homeView.style.display = 'flex';
+            btnSettings.innerText = '⚙';
+            setTimeout(() => document.getElementById('syllable').focus(), 50);
+        }
+    }
+    btnSettings.onclick = toggleSettings;
+    document.getElementById('btn-back').onclick = toggleSettings;
+
+    document.getElementById('slide-lps').oninput = e => {
+        lps = parseFloat(e.target.value);
+        document.getElementById('val-lps').innerText = lps;
+        document.getElementById('status-footer').innerText = "LPS: " + lps + " | Typo: " + humanChance + "%";
+        saveSetting('wbh_lps', lps);
+    };
+    document.getElementById('slide-error').oninput = e => {
+        humanChance = parseInt(e.target.value);
+        document.getElementById('val-error').innerText = humanChance + "%";
+        document.getElementById('status-footer').innerText = "LPS: " + lps + " | Typo: " + humanChance + "%";
+        saveSetting('wbh_humanChance', humanChance);
+    };
+    document.getElementById('input-theme').onchange = e => {
+        theme = e.target.value.toLowerCase().trim();
+        saveSetting('wbh_theme', theme);
+        fetchTheme();
+    };
+    document.getElementById('chk-nospace').onchange = e => {
+        noSpace = e.target.checked;
+        saveSetting('wbh_noSpace', noSpace);
+    };
+
+    // Custom Play Style dropdown
+    const trigger = document.getElementById('playmode-trigger');
+    const dropdown = document.getElementById('playmode-dropdown');
+    const playmodeLabel = document.getElementById('playmode-label');
+    const styleOptions = { Normal: 'Normal', Pro: 'Pro Mod (Long & Complex)', Noob: 'Noob Mod (Short & Simple)' };
+    playmodeLabel.innerText = styleOptions[playMode] || 'Normal';
+    document.querySelectorAll('.wbh-select-option').forEach(o => {
+        o.classList.toggle('selected', o.getAttribute('data-value') === playMode);
+    });
+    trigger.onclick = e => {
+        e.stopPropagation();
+        const isOpen = dropdown.style.display === 'flex';
+        dropdown.style.display = isOpen ? 'none' : 'flex';
+        trigger.style.borderColor = isOpen ? 'rgba(255, 255, 255, 0.08)' : '#7c3aed';
+    };
+    document.addEventListener('click', () => {
+        dropdown.style.display = 'none';
+        trigger.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+    });
+    document.querySelectorAll('.wbh-select-option').forEach(opt => {
+        opt.onclick = e => {
+            e.stopPropagation();
+            const val = opt.getAttribute('data-value');
+            playMode = val;
+            playmodeLabel.innerText = opt.innerText;
+            dropdown.style.display = 'none';
+            trigger.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+            saveSetting('wbh_playMode', val);
+            document.querySelectorAll('.wbh-select-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+        };
+    });
+
+    // FIND / search logic
+    function computeScore(word, currentMissing) {
+        let score = 0;
+        const found = new Set();
+        for (const char of word) {
+            if (currentMissing.includes(char) && !found.has(char)) { score += 100; found.add(char); }
+        }
+        if (themeWords.has(word)) score += 1000;
+        if (playMode === "Pro") score += word.length * 5;
+        else if (playMode === "Noob") score -= word.length * 10;
+        return score;
+    }
+
+    function processSearch() {
+        const syl = document.getElementById('syllable').value.toLowerCase().trim();
+        if (!syl || dictionary.length === 0) return;
+
+        const validWords = dictionary.filter(w => {
+            if (!w.includes(syl)) return false;
+            if (badWords.has(w)) return false;
+            if (noSpace && (w.includes(' ') || w.includes('-'))) return false;
+            if (playMode === "Pro" && w.length < 13) return false;
+            if (playMode === "Noob" && w.length > 7) return false;
+            return true;
+        });
+
+        const statusEl = document.getElementById('status');
+        if (validWords.length === 0) {
+            statusEl.innerText = "No word found!";
+            statusEl.style.color = "#ef4444";
+            return;
+        }
+
+        const currentMissing = getMissingAlphabet();
+        validWords.sort((a, b) => computeScore(b, currentMissing) - computeScore(a, currentMissing));
+        const bestWord = validWords[0];
+
+        statusEl.innerText = "Typing: " + bestWord + "...";
+        statusEl.style.color = "#7c3aed";
+
+        let newMissing = currentMissing.filter(c => !bestWord.includes(c));
+        if (newMissing.length === 0) newMissing = FULL_ALPHABET;
+        history.push({ alphabet: newMissing, word: bestWord });
+        renderAlphabet(newMissing);
+        badWords.add(bestWord);
+
+        document.getElementById('syllable').value = "";
+        document.body.style.pointerEvents = "none";
+
+        const timeoutId = setTimeout(() => {
+            document.body.style.pointerEvents = "auto";
+            statusEl.innerText = "Ready (Timeout)";
+            statusEl.style.color = "#ef4444";
+            document.getElementById('syllable').focus();
+        }, 5000);
+
+        window.wbhAPI.typeWord(bestWord, lps, humanChance)
+            .then(res => {
+                clearTimeout(timeoutId);
+                if (res && res.ok === false) {
+                    statusEl.innerText = res.error || "Input error";
+                    statusEl.style.color = "#ef4444";
+                } else {
+                    statusEl.innerText = "Ready!";
+                    statusEl.style.color = "#949ba4";
+                }
+            })
+            .catch(() => {
+                clearTimeout(timeoutId);
+                statusEl.innerText = "Input error";
+                statusEl.style.color = "#ef4444";
+            })
+            .finally(() => {
+                document.body.style.pointerEvents = "auto";
+                setTimeout(() => document.getElementById('syllable').focus(), 50);
+            });
+    }
+
+    document.getElementById('btn-find').onclick = processSearch;
+    document.getElementById('btn-close').onclick = () => window.wbhAPI.closeWindow();
+    document.getElementById('syllable').onkeydown = e => {
+        if (e.key === "Enter") { e.preventDefault(); processSearch(); }
+    };
+</script>
+</body>
+</html>

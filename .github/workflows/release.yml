@@ -1,0 +1,44 @@
+name: Release Abyss Injector
+
+# Workflow séparé de publish-dist.yml (qui build la dist Abyss elle-même).
+# Ne se déclenche que sur un tag injector-vX.Y.Z, jamais sur push vers master,
+# donc aucun risque de croisement avec la CI du projet principal — même si ce
+# fichier doit vivre à la racine .github/workflows/ (GitHub n'exécute que les
+# workflows placés là, jamais ceux dans un sous-dossier comme injector/).
+on:
+  push:
+    tags:
+      - "injector-v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        working-directory: injector
+        run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: injector
+          tagName: ${{ github.ref_name }}
+          releaseName: "Abyss Injector ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false

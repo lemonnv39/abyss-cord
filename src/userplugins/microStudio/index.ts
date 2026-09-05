@@ -103,15 +103,40 @@ const settings = definePluginSettings({
     },
 });
 
+let diagFait = false;
+
+/** Diagnostic temporaire : liste les vraies méthodes de la connexion micro,
+ *  pour vérifier si Discord expose highpass/stéréo avant d'écrire du code
+ *  dessus. À retirer une fois la réponse obtenue. */
+function diagnostic(c: any) {
+    if (diagFait) return;
+    diagFait = true;
+    try {
+        const methodes: string[] = [];
+        let proto = c;
+        while (proto && proto !== Object.prototype) {
+            methodes.push(...Object.getOwnPropertyNames(proto));
+            proto = Object.getPrototypeOf(proto);
+        }
+        const uniques = [...new Set(methodes)].sort();
+        console.log("[MicroStudio][DIAG] Méthodes de connexion micro:", uniques);
+        console.log("[MicroStudio][DIAG] Filtré highpass/stereo/channel:", uniques.filter(m => /highpass|stereo|channel/i.test(m)));
+    } catch (e) {
+        console.log("[MicroStudio][DIAG] échec:", e);
+    }
+}
+
 /** Les connexions du MICRO, et elles seules (règle 1). */
 function connexionsMicro(): any[] {
     try {
         const moteur: any = MediaEngineStore.getMediaEngine?.();
         const brut = moteur?.connections;
         if (!brut) return [];
-        return Array.from(brut as Iterable<any>).filter(
+        const liste = Array.from(brut as Iterable<any>).filter(
             c => c && c.context === "default" && !c.destroyed,
         );
+        if (liste[0]) diagnostic(liste[0]);
+        return liste;
     } catch {
         return [];
     }
