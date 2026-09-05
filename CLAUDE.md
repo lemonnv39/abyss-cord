@@ -79,8 +79,15 @@ en dehors de ce repo directement dans les installations Discord/Canary).
 - `definePlugin({ name: "..." ...})` : `name` doit être **littéralement la
   première propriété** (regex de `resolvePluginName` dans
   `scripts/build/common.mjs`).
-- Build local sans remote git réel :
-  `EQUICORD_HASH=0000000000000000000000000000000000000000 EQUICORD_REMOTE=Equicord/Equicord node scripts/build/build.mjs`
+- Build local : `node scripts/build/build.mjs --disable-updater`. Depuis le
+  `git init`, `~git-hash`/`~git-remote` se résolvent tout seuls via le vrai
+  `.git` (plus besoin des variables `EQUICORD_HASH`/`EQUICORD_REMOTE`
+  factices utilisées avant). **`--disable-updater` est obligatoire** : sans
+  lui, le check de mise à jour d'Abyss se compare au vrai repo upstream
+  Equicord (ou à un `lemonnv39/abyss-cord` sans Release publiée) et se
+  croit "en retard" en permanence → bannière "Abyss has been updated!"
+  qui boucle à chaque restart (bug vécu et corrigé une fois, cf.
+  `CHANGELOG.md`).
 - Un changement dans un `native.ts` (process principal) exige un **restart
   complet** de Discord/Canary (pas juste Ctrl+R) — `patcher.js` n'est chargé
   qu'au démarrage d'Electron.

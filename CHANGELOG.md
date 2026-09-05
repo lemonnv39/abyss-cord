@@ -20,6 +20,16 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   Discord/Canary data folders, plus the orphaned `GhostAccount` and
   `SkinwalkerProfile` entries in `settings.json`.
 
+### Fixed
+- The "Abyss has been updated! Restart" banner looping forever on every
+  restart: local builds embedded a placeholder git hash/remote
+  (`EQUICORD_HASH=0000...`, `EQUICORD_REMOTE=Equicord/Equicord`) that
+  compared this fork against the real upstream Equicord repo's releases,
+  which of course never match — so the updater always believed itself
+  outdated, auto-applied a broken "update", and re-prompted every launch.
+  Builds now use `--disable-updater` and let `~git-hash`/`~git-remote`
+  resolve from the real local `.git` instead.
+
 ## [1.0.0] — 2026-09-05
 
 ### Added
