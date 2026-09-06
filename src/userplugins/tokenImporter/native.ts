@@ -5,6 +5,7 @@
  */
 
 import { app, BrowserWindow, net, safeStorage } from "electron";
+import { spawn } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 
@@ -70,4 +71,65 @@ export async function decryptToken(_: any, encryptedBase64: string): Promise<str
 // pas proprement l'état interne de Discord après un changement de token.
 export function reload(_: any): void {
     BrowserWindow.getFocusedWindow()?.webContents.reload();
+}
+
+// ── Lancer une autre install Discord locale (onglet "Comptes locaux") ──────────
+// `window.open("discord://")` côté renderer ne fait rien de fiable : Electron
+// ne shell-out pas vers le protocole OS pour un simple window.open, et même si
+// le protocole était enregistré, il ne cible que l'install par défaut — pas
+// forcément celle réellement présente sur cette machine (ex: installs dans
+// C:\ProgramData\<user>\ plutôt que %LOCALAPPDATA%, comme c'est le cas ici).
+// On retrouve donc directement l'exécutable réel et on le lance via son propre
+// Update.exe (le lanceur Squirrel que Discord utilise lui-même), qui focus la
+// fenêtre existante si l'app tourne déjà au lieu d'en ouvrir une deuxième.
+const BRANCH_DIRS: Record<string, string> = {
+    stable: "Discord",
+    canary: "DiscordCanary",
+    ptb: "DiscordPTB",
+};
+
+const BRANCH_EXE: Record<string, string> = {
+    stable: "Discord.exe",
+    canary: "DiscordCanary.exe",
+    ptb: "DiscordPTB.exe",
+};
+
+function candidateBases(): string[] {
+    const bases: string[] = [];
+    if (process.env.LOCALAPPDATA) bases.push(process.env.LOCALAPPDATA);
+    if (process.env.PROGRAMDATA) {
+        if (process.env.USERNAME) bases.push(join(process.env.PROGRAMDATA, process.env.USERNAME));
+        bases.push(process.env.PROGRAMDATA);
+    }
+    return bases;
+}
+
+function findInstallBase(branch: string): string | null {
+    const dirName = BRANCH_DIRS[branch];
+    if (!dirName) return null;
+    for (const base of candidateBases()) {
+        const installDir = join(base, dirName);
+        if (existsSync(join(installDir, "Update.exe"))) return installDir;
+    }
+    return null;
+}
+
+export async function launchLocalInstall(_: any, branch: string): Promise<{ ok: boolean; error?: string; }> {
+    if (process.platform !== "win32") return { ok: false, error: "unsupported_platform" };
+
+    const exe = BRANCH_EXE[branch];
+    if (!exe) return { ok: false, error: "unknown_branch" };
+
+    const installDir = findInstallBase(branch);
+    if (!installDir) return { ok: false, error: "not_found" };
+
+    try {
+        spawn(join(installDir, "Update.exe"), ["--processStart", exe], {
+            detached: true,
+            stdio: "ignore",
+        }).unref();
+        return { ok: true };
+    } catch (e: any) {
+        return { ok: false, error: e?.message ?? "spawn_failed" };
+    }
 }

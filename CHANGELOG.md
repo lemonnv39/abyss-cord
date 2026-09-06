@@ -38,8 +38,28 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 - `SmoothType` plugin, ported from Nightcord: replaces the chat input's
   blinking caret with a synthetic one that glides smoothly between
   positions (configurable duration, easing curve, color).
+- `GameActivityButton` plugin: DOM-based replacement for the stock
+  `GameActivityToggle` (see Fixed) — same toggle, placed to the left of the
+  mic button, white when active and red-with-strikethrough when off
+  (matches the mic-muted color).
 
 ### Fixed
+- `NewPluginsManager` was disabled in settings — re-enabled; it's what shows
+  the "New Plugins and Settings" popup on connect when plugins are added.
+- `TokenImporter`'s "Comptes locaux" tab: the "Ouvrir" button used
+  `window.open("discord://")`, which doesn't reliably shell out to the OS
+  protocol handler from an Electron renderer, and would target the default
+  install rather than whichever one is actually present (e.g. installs
+  under `C:\ProgramData\<user>\` instead of `%LOCALAPPDATA%`). Now launches
+  the real executable directly via its own `Update.exe --processStart`.
+- Stock `GameActivityToggle` stopped adding its button (next to mic/deafen):
+  its `UserAreaAPI` dependency patches Discord's internal render code via
+  an anchor string (`.DISPLAY_NAME_STYLES_COACHMARK)`) that used to sit next
+  to the account panel's render logic — a Discord bundle restructure moved
+  it into an unrelated "coachmark" enum module, so the patch's `find`
+  matches but the actual code replacement silently fails. Rather than
+  chase a new anchor in Discord's minified JS (guaranteed to rot again),
+  replaced with `GameActivityButton` (DOM-based, see Added).
 - The "Abyss has been updated! Restart" banner looping forever on every
   restart: local builds embedded a placeholder git hash/remote
   (`EQUICORD_HASH=0000...`, `EQUICORD_REMOTE=Equicord/Equicord`) that

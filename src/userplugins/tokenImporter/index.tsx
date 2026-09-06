@@ -190,9 +190,9 @@ function copyMyToken() {
 // SA console pour récupérer TON propre token, comme le bouton "Copier mon
 // token actuel" le fait déjà pour cette fenêtre-ci.
 const LOCAL_INSTALL_TARGETS = [
-    { label: "Discord", uri: "discord://" },
-    { label: "Discord Canary", uri: "discordcanary://" },
-    { label: "Discord PTB", uri: "discordptb://" },
+    { label: "Discord", branch: "stable" },
+    { label: "Discord Canary", branch: "canary" },
+    { label: "Discord PTB", branch: "ptb" },
 ];
 
 const TOKEN_GRAB_SCRIPT = `(function() {
@@ -216,9 +216,21 @@ const TOKEN_GRAB_SCRIPT = `(function() {
     console.log("Token copié dans le presse-papier !");
 })();`;
 
-function openLocalInstall(uri: string) {
+const BRANCH_NOT_FOUND_LABEL: Record<string, string> = {
+    not_found: "introuvable sur cette machine",
+    unsupported_platform: "non supporté sur cette plateforme",
+};
+
+async function openLocalInstall(branch: string, label: string) {
     try {
-        window.open(uri, "_blank");
+        const res = await Native.launchLocalInstall(branch);
+        if (!res.ok) {
+            Toasts.show({
+                message: `${label} ${BRANCH_NOT_FOUND_LABEL[res.error ?? ""] ?? "n'a pas pu être lancé"}`,
+                type: Toasts.Type.FAILURE,
+                id: Toasts.genId(),
+            });
+        }
     } catch (e) {
         console.error("[TokenImporter] Failed to open install:", e);
     }
@@ -240,7 +252,7 @@ function LocalInstallsTab() {
                             <span className={cl("token-hidden")}>Console → coller le script → copier le résultat</span>
                         </div>
                         <div className={cl("row-actions")}>
-                            <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => openLocalInstall(target.uri)}>
+                            <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => openLocalInstall(target.branch, target.label)}>
                                 Ouvrir
                             </Button>
                             <button
