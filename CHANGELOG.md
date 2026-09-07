@@ -43,6 +43,20 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   mic button, white when active and red-with-strikethrough when off
   (matches the mic-muted color).
 
+### Changed
+- `FollowUser`'s Fake Mute/Fake Deafen: switched from trying to cut real
+  local audio (via `navigator.mediaDevices.getUserMedia` for mute — never
+  fires on Desktop, whose voice pipeline goes through a native addon, not
+  the browser's WebRTC path — and `setOutputVolume`/`MediaEngineConnection`
+  for deafen) to forging the Gateway voice-state packet directly (op 4),
+  ported from Nightcord's `FakeVoice`: `self_mute`/`self_deaf` are now sent
+  as `true` independently of your real state, so **others see you as
+  muted/deafened while your own mic and audio keep working normally** —
+  the opposite direction from before (icon used to stay normal while audio
+  was really cut, which never actually worked). Re-asserted automatically
+  against Discord's own periodic resync attempts. Menu labels updated to
+  match ("icône muette, micro actif" / "icône sourde, audio actif").
+
 ### Fixed
 - `NewPluginsManager` was disabled in settings — re-enabled; it's what shows
   the "New Plugins and Settings" popup on connect when plugins are added.

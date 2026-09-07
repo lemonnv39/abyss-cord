@@ -15,7 +15,9 @@ import { MediaEngineStore, Menu, React, Toasts, useEffect, useState } from "@web
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 const ChannelStore = findStoreLazy("ChannelStore");
 const UserStore = findStoreLazy("UserStore");
+const SelectedChannelStore = findStoreLazy("SelectedChannelStore");
 const FluxDispatcher = findByPropsLazy("dispatch", "subscribe");
+const GatewaySocket = findByPropsLazy("getSocket");
 
 const DS_KEY = "followuser-v2";
 
@@ -43,14 +45,14 @@ let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Fake mute/deafen — the icon other members see stays whatever it already
 // was (self_mute/self_deaf are never touched here); only the REAL audio
-// behaviour is cut independently: the outgoing mic track gets disabled
-// (real silence sent) and/or local output volume goes to 0 (real silence
-// heard), same technique validated in the standalone Ghost Account app.
+// behaviour is cut independently, via the native MediaEngineConnection's own
+// setSelfMute/setSelfDeaf (see getActiveConnection below) — NOT the gateway
+// voice-state flag, and NOT navigator.mediaDevices.getUserMedia: Discord
+// Desktop's voice pipeline goes through a native addon (discord_voice.node),
+// not the browser's real getUserMedia/WebRTC path, so a getUserMedia hook
+// (the previous approach here) never fires and silently does nothing.
 let fakeMute = false;
 let fakeDeafen = false;
-let micTrack: MediaStreamTrack | null = null;
-let rememberedOutputVolume = 100;
-let getUserMediaPatched = false;
 
 const listeners = new Set<() => void>();
 function notifyAll() { listeners.forEach(fn => fn()); }
@@ -112,54 +114,64 @@ function clearInactivityTimer() {
 }
 
 // ── Fake mute / fake deafen ────────────────────────────────────────────────────
-function installGetUserMediaHook() {
-    if (getUserMediaPatched) return;
-    getUserMediaPatched = true;
+// Porté de Nightcord (FakeVoice) : on ne touche à rien côté audio réel — on
+// ment sur le voice-state envoyé au Gateway (op 4). Les autres te voient
+// muet et/ou sourd selon ce qu'on force ici, alors que ton micro et ton
+// audio continuent de fonctionner normalement chez toi. Chaque champ est
+// forcé indépendamment ; celui qui n'est pas "fake" reflète le vrai état
+// (pas de mensonge accidentel sur l'autre moitié).
+let lastFakeVoiceSync = 0;
+
+function sendFakeVoiceState() {
     try {
-        const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-        navigator.mediaDevices.getUserMedia = function (constraints: MediaStreamConstraints) {
-            return orig(constraints).then(stream => {
-                const track = stream.getAudioTracks()[0];
-                if (track) {
-                    micTrack = track;
-                    track.enabled = !fakeMute;
-                    track.addEventListener("ended", () => { if (micTrack === track) micTrack = null; });
-                }
-                return stream;
-            });
-        };
+        const channelId = SelectedChannelStore?.getVoiceChannelId?.();
+        if (!channelId) return;
+        const socket = GatewaySocket?.getSocket?.();
+        if (!socket) return;
+        const channel = ChannelStore?.getChannel?.(channelId);
+
+        lastFakeVoiceSync = Date.now();
+        socket.send(4, {
+            guild_id: channel?.guild_id ?? null,
+            channel_id: channelId,
+            self_mute: fakeMute ? true : (MediaEngineStore?.isSelfMute?.() ?? false),
+            self_deaf: fakeDeafen ? true : (MediaEngineStore?.isSelfDeaf?.() ?? false),
+            self_video: false,
+        });
     } catch (e) {
-        console.error("[FollowUser] Failed to install getUserMedia hook:", e);
+        console.error("[FollowUser] sendFakeVoiceState failed:", e);
     }
+}
+
+// Discord retente périodiquement de resynchroniser le voice-state avec
+// l'état réel (qui, lui, n'a jamais bougé) — on réaffirme le mensonge à
+// chaque écho, avec un debounce pour éviter une boucle serrée avec notre
+// propre envoi.
+function onFakeVoiceEcho() {
+    if (!fakeMute && !fakeDeafen) return;
+    if (Date.now() - lastFakeVoiceSync < 1000) return;
+    setTimeout(sendFakeVoiceState, 0);
 }
 
 function toggleFakeMute() {
     fakeMute = !fakeMute;
-    if (micTrack) micTrack.enabled = !fakeMute;
+    sendFakeVoiceState();
     notifyAll();
-    Toasts.show({ message: fakeMute ? "Fake mute activé — icône normale, micro réellement coupé" : "Fake mute désactivé", type: Toasts.Type.MESSAGE, id: Toasts.genId() });
+    Toasts.show({ message: fakeMute ? "Fake mute activé — les autres te voient muet, tu parles normalement" : "Fake mute désactivé", type: Toasts.Type.MESSAGE, id: Toasts.genId() });
 }
 
 function toggleFakeDeafen() {
     fakeDeafen = !fakeDeafen;
-    try {
-        // setOutputVolume lives on the MediaEngine instance (what
-        // getMediaEngine() returns), not on MediaEngineStore itself — the
-        // store only exposes read-only getters for React to react to.
-        // Calling it on the store silently no-ops via optional chaining,
-        // which is why the checkbox toggled with no real effect before.
-        const engine = MediaEngineStore?.getMediaEngine?.();
-        if (fakeDeafen) {
-            rememberedOutputVolume = MediaEngineStore?.getOutputVolume?.() ?? 100;
-            engine?.setOutputVolume?.(0);
-        } else {
-            engine?.setOutputVolume?.(rememberedOutputVolume ?? 100);
-        }
-    } catch (e) {
-        console.error("[FollowUser] toggleFakeDeafen failed:", e);
-    }
+    sendFakeVoiceState();
     notifyAll();
-    Toasts.show({ message: fakeDeafen ? "Fake deafen activé — icône normale, audio réellement coupé" : "Fake deafen désactivé", type: Toasts.Type.MESSAGE, id: Toasts.genId() });
+    Toasts.show({ message: fakeDeafen ? "Fake deafen activé — les autres te voient sourd, tu entends normalement" : "Fake deafen désactivé", type: Toasts.Type.MESSAGE, id: Toasts.genId() });
+}
+
+// Rejoue le mensonge sur tout changement de voice state, pour contrer les
+// tentatives de resync de Discord (voir onFakeVoiceEcho) et pour survivre à
+// un changement de salon.
+function onOwnVoiceStateEvent() {
+    onFakeVoiceEcho();
 }
 
 // ── Listener voix ─────────────────────────────────────────────────────────────
@@ -291,13 +303,13 @@ const ctxPatch: NavContextMenuPatchCallback = (children, props) => {
         />,
         <Menu.MenuCheckboxItem
             id="follow-user-fake-mute"
-            label="Fake Mute (icône normale, micro coupé)"
+            label="Fake Mute (icône muette, micro actif)"
             checked={fakeMute}
             action={toggleFakeMute}
         />,
         <Menu.MenuCheckboxItem
             id="follow-user-fake-deafen"
-            label="Fake Deafen (icône normale, audio coupé)"
+            label="Fake Deafen (icône sourde, audio actif)"
             checked={fakeDeafen}
             action={toggleFakeDeafen}
         />
@@ -319,7 +331,10 @@ export default definePlugin({
     },
 
     async start() {
-        installGetUserMediaHook();
+        FluxDispatcher?.subscribe?.("VOICE_STATE_UPDATES", onOwnVoiceStateEvent);
+        FluxDispatcher?.subscribe?.("AUDIO_TOGGLE_SELF_MUTE", onOwnVoiceStateEvent);
+        FluxDispatcher?.subscribe?.("AUDIO_TOGGLE_SELF_DEAF", onOwnVoiceStateEvent);
+
         const saved = await DataStore.get(DS_KEY) as { id: string; name: string; } | null;
         if (saved?.id) {
             followedId = saved.id;
@@ -334,6 +349,14 @@ export default definePlugin({
     },
 
     stop() {
+        FluxDispatcher?.unsubscribe?.("VOICE_STATE_UPDATES", onOwnVoiceStateEvent);
+        FluxDispatcher?.unsubscribe?.("AUDIO_TOGGLE_SELF_MUTE", onOwnVoiceStateEvent);
+        FluxDispatcher?.unsubscribe?.("AUDIO_TOGGLE_SELF_DEAF", onOwnVoiceStateEvent);
+        if (fakeMute || fakeDeafen) {
+            fakeMute = false;
+            fakeDeafen = false;
+            sendFakeVoiceState();
+        }
         stopFlux();
         clearInactivityTimer();
         followedId = null; followedName = ""; followedChannel = null;
