@@ -42,8 +42,31 @@ pub fn cached_patcher_path(app: &AppHandle) -> PathBuf {
     dist_dir(app).join("patcher.js")
 }
 
+/// SHA du build actuellement en cache (celui qu'un patch écrirait MAINTENANT
+/// dans le stub, voir asar::write_app_asar) — None si jamais téléchargé ou si
+/// le cache du SHA a échoué à un précédent téléchargement (best-effort, voir
+/// download_latest).
+pub fn cached_sha(app: &AppHandle) -> Option<String> {
+    fs::read_to_string(sha_cache_path(app)).ok().map(|s| s.trim().to_string())
+}
+
 fn sha_cache_path(app: &AppHandle) -> PathBuf {
     dist_dir(app).join(".build-sha")
+}
+
+/// Dernier SHA distant CONNU — distinct de sha_cache_path (qui suit le SHA du
+/// build réellement téléchargé sur disque) : celui-ci est rafraîchi à chaque
+/// lancement de l'injecteur (voir spawn_silent_check) même si aucun
+/// téléchargement n'a eu lieu, pour que chaque ligne Discord puisse comparer
+/// son propre build_sha (embarqué dans son stub, voir asar.rs) à la dernière
+/// version connue et afficher "à jour" / "mettre à jour" sans jamais avoir
+/// besoin d'un check manuel.
+fn latest_sha_path(app: &AppHandle) -> PathBuf {
+    dist_dir(app).join(".latest-sha")
+}
+
+pub fn latest_known_sha(app: &AppHandle) -> Option<String> {
+    fs::read_to_string(latest_sha_path(app)).ok().map(|s| s.trim().to_string())
 }
 
 fn http_client() -> Result<reqwest::Client, String> {
@@ -141,14 +164,29 @@ pub async fn check_for_update(app: &AppHandle) -> Result<Option<String>, String>
 /// Check silencieux et non-bloquant au lancement, comme updater::spawn_silent_check
 /// mais pour le CONTENU d'Abyss plutôt que pour l'injecteur lui-même —
 /// n'installe/télécharge jamais rien tout seul, prévient juste le frontend.
+///
+/// Rafraîchit systématiquement latest_sha_path (un seul appel API, léger) et
+/// émet "latest-build-sha" à chaque lancement, pour que les lignes Discord de
+/// la liste sachent immédiatement si leur build est à jour — sans ça,
+/// "mettre à jour" ne s'afficherait jamais avant un check manuel, ce qui ne
+/// servirait à rien. L'ancien event "abyss-build-update-available" (cache de
+/// fichiers téléchargés vs distant) reste émis séparément pour la bannière de
+/// mise à jour du build en Réglages.
 pub fn spawn_silent_check(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        match check_for_update(&app).await {
-            Ok(Some(sha)) => {
-                let _ = app.emit("abyss-build-update-available", serde_json::json!({ "sha": sha }));
+        let Ok(client) = http_client() else { return };
+        let Ok(remote_sha) = fetch_latest_sha(&client).await else {
+            eprintln!("[dist_fetch] check silencieux échoué (récupération du SHA distant)");
+            return;
+        };
+
+        let _ = fs::write(latest_sha_path(&app), &remote_sha);
+        let _ = app.emit("latest-build-sha", serde_json::json!({ "sha": remote_sha }));
+
+        if let Ok(cached) = fs::read_to_string(sha_cache_path(&app)) {
+            if cached.trim() != remote_sha.trim() {
+                let _ = app.emit("abyss-build-update-available", serde_json::json!({ "sha": remote_sha }));
             }
-            Ok(None) => {}
-            Err(e) => eprintln!("[dist_fetch] check silencieux échoué : {e}"),
         }
     });
 }

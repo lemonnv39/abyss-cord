@@ -1,13 +1,81 @@
+/* Police d'affichage pour le logo/titres — bundlée en local (pas de requête
+   réseau au runtime, l'app doit marcher hors-ligne) plutôt que via un lien
+   Google Fonts. Corps de texte laissé sur la pile système (perf + lisibilité
+   à petite taille, cohérent avec la recommandation "un display + un system"). */
+@font-face {
+    font-family: "Space Grotesk";
+    font-style: normal;
+    font-weight: 500 700;
+    font-display: swap;
+    src: url("./assets/fonts/SpaceGrotesk.woff2") format("woff2");
+}
+
+/* Wordmark "Abyss" uniquement — géométrique/anguleuse, lecture immédiate
+   "HUD spatial" plutôt qu'un simple sans-serif gras. */
+@font-face {
+    font-family: "Orbitron";
+    font-style: normal;
+    font-weight: 600 800;
+    font-display: swap;
+    src: url("./assets/fonts/Orbitron.woff2") format("woff2");
+}
+
+/* Wordmark v2 — condensée/ultra-grasse, inclinée via transform (pas de coupe
+   italique fournie par cette police) pour matcher la référence donnée. */
+@font-face {
+    font-family: "Anton";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("./assets/fonts/Anton.woff2") format("woff2");
+}
+
 :root {
     color-scheme: dark;
-    --bg: #0a0a0a;
+
+    /* ── Surfaces ─────────────────────────────────────────────────────── */
+    --bg: #050506;
     --bg-elevated: #111214;
+    --surface: rgba(18, 18, 20, 0.62);
+    --surface-strong: rgba(14, 14, 16, 0.78);
     --border: rgba(255, 255, 255, 0.1);
     --border-strong: rgba(255, 255, 255, 0.25);
-    --text: #f2f2f2;
-    --text-dim: #9a9a9a;
-    --danger: #e5484d;
-    --ok: #4ade80;
+
+    /* ── Texte ────────────────────────────────────────────────────────── */
+    --text: #ffffff;
+    --text-dim: #a8adb8;
+    --text-faint: rgba(255, 255, 255, 0.55);
+
+    /* ── Accents ──────────────────────────────────────────────────────── */
+    /* Indigo : action primaire / marque. Cyan : focus & lueur "spatiale",
+       jamais utilisé pour une action — purement un signal d'état. */
+    --accent: #5865f2;
+    --accent-hover: #6f7bff;
+    --accent-glow: #7dd8ff;
+    --danger: #ed4245;
+    --warning: #f5a623;
+    --ok: #23a55a;
+
+    /* ── Rythme ───────────────────────────────────────────────────────── */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+
+    /* ── Mouvement ────────────────────────────────────────────────────── */
+    /* ease-out-expo — arrivée franche puis décélération douce, plus "premium"
+       qu'un ease générique ; unique jeu de courbes réutilisé partout pour
+       une sensation cohérente (voir motion-consistency). */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --duration-fast: 150ms;
+    --duration-base: 300ms;
+    --duration-slow: 550ms;
 
     font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
     font-synthesis: none;
@@ -33,4 +101,48 @@ button {
 
 input {
     font-family: inherit;
+}
+
+/* Anneau de focus clavier cohérent avec le thème (lueur cyan plutôt que le
+   bleu par défaut du navigateur) — visible sur tout élément interactif
+   custom, jamais retiré (voir focus-states, une règle CRITICAL). */
+:focus-visible {
+    outline: 2px solid var(--accent-glow);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+/* Scrollbar fine et sombre, cohérente avec le thème — le scrollbar Windows
+   par défaut (large, avec flèches) jure complètement avec l'esthétique
+   épurée du reste de l'injecteur. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
 }

@@ -1,62 +1,99 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { fade } from "svelte/transition";
     import { listen } from "@tauri-apps/api/event";
     import type { Update } from "@tauri-apps/plugin-updater";
 
+    import TitleBar from "./lib/components/TitleBar.svelte";
+    import BlackHoleBackground from "./lib/components/BlackHoleBackground.svelte";
+    import Splash from "./lib/components/Splash.svelte";
+    import DiscordRow from "./lib/components/DiscordRow.svelte";
     import UpdateBanner from "./lib/components/UpdateBanner.svelte";
+    import Settings from "./lib/components/Settings.svelte";
     import { patcherApi } from "./lib/api/patcher";
     import { checkForUpdate, installUpdate } from "./lib/api/updater";
-    import type { DiscordInstall } from "./lib/types";
+    import type { DiscordInstall, InstallProgressEvent, RowPhase } from "./lib/types";
 
-    let tab = $state<"home" | "settings">("home");
+    let screen = $state<"splash" | "list" | "settings">("splash");
+    let screenBeforeSettings: "splash" | "list" = "splash";
+
     let installs = $state<DiscordInstall[]>([]);
-    let busyId = $state<string | null>(null);
-    let error = $state<string | null>(null);
+    let phases = $state<Record<string, RowPhase>>({});
+    let latestBuildSha = $state<string | null>(null);
+    let globalError = $state<string | null>(null);
 
     let pendingUpdate = $state<Update | null>(null);
     let installingUpdate = $state(false);
 
     let buildUpdating = $state(false);
-    let buildMessage = $state<string | null>(null);
     let buildUpdateAvailable = $state(false);
+
+    function sleep(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function phaseOf(branch: string): RowPhase {
+        return phases[branch] ?? { kind: "idle" };
+    }
+
+    const anyInstalling = $derived(Object.values(phases).some(p => p.kind === "installing"));
+
+    function needsUpdate(install: DiscordInstall): boolean {
+        return (
+            install.patch_owner === "abyss" &&
+            !!install.build_sha &&
+            !!latestBuildSha &&
+            install.build_sha !== latestBuildSha
+        );
+    }
 
     async function refreshInstalls() {
         try {
             installs = await patcherApi.listInstalls();
         } catch (e) {
-            error = String(e);
+            globalError = String(e);
         }
     }
 
-    async function togglePatch(install: DiscordInstall) {
-        error = null;
-        busyId = install.id;
+    async function runInstall(install: DiscordInstall) {
+        if (!install.resources_path || !install.base_path) return;
+        globalError = null;
+        phases = { ...phases, [install.branch]: { kind: "installing", step: "cleaning" } };
         try {
-            if (install.is_patched) {
-                await patcherApi.unpatch(install.resources_path, install.branch);
-            } else {
-                // L'injecteur télécharge et met en cache le build public
-                // d'Abyss tout seul (voir dist_fetch.rs côté Rust).
-                await patcherApi.patch(install.resources_path, install.branch);
-            }
-            await refreshInstalls();
+            await patcherApi.patch(install.resources_path, install.base_path, install.branch);
+            await sleep(1100);
         } catch (e) {
-            error = String(e);
+            if (phaseOf(install.branch).kind !== "error") {
+                phases = { ...phases, [install.branch]: { kind: "error", message: String(e) } };
+            }
+            await sleep(2600);
         } finally {
-            busyId = null;
+            phases = { ...phases, [install.branch]: { kind: "idle" } };
+            await refreshInstalls();
+        }
+    }
+
+    async function runUninstall(install: DiscordInstall) {
+        if (!install.resources_path || !install.base_path) return;
+        globalError = null;
+        try {
+            await patcherApi.unpatch(install.resources_path, install.base_path, install.branch);
+        } catch (e) {
+            globalError = String(e);
+        } finally {
+            phases = { ...phases, [install.branch]: { kind: "idle" } };
+            await refreshInstalls();
         }
     }
 
     async function updateAbyssBuild() {
         buildUpdating = true;
-        buildMessage = null;
-        error = null;
+        globalError = null;
         try {
             await patcherApi.updateAbyssBuild();
-            buildMessage = "Build Abyss à jour — redémarre Discord pour l'appliquer.";
             buildUpdateAvailable = false;
         } catch (e) {
-            error = String(e);
+            globalError = String(e);
         } finally {
             buildUpdating = false;
         }
@@ -68,19 +105,31 @@
         try {
             await installUpdate(pendingUpdate);
         } catch (e) {
-            error = String(e);
+            globalError = String(e);
             installingUpdate = false;
         }
     }
 
+    /// Check manuel de l'injecteur lui-même (bouton Réglages) — distinct du
+    /// build Abyss (patcher.js et consorts) : ça, c'est une nouvelle version
+    /// de l'appli (nouveau style, nouvelle fonctionnalité...), déclenchée à
+    /// la demande plutôt que d'attendre le prochain lancement.
+    async function checkInjectorUpdate(): Promise<"found" | "none"> {
+        const u = await checkForUpdate();
+        if (u) {
+            pendingUpdate = u;
+            return "found";
+        }
+        return "none";
+    }
+
     onMount(() => {
         refreshInstalls();
+        patcherApi.getLatestBuildSha().then(sha => { latestBuildSha = sha; });
 
-        // Le check silencieux au lancement tourne côté Rust (updater.rs) ; il
-        // se contente d'émettre cet event, jamais d'installer quoi que ce
-        // soit tout seul. On relance `check()` ici juste pour récupérer
-        // l'objet Update complet (téléchargement/install restent manuels).
-        const unlistenPromise = listen<{ version: string; notes?: string }>(
+        // Injecteur lui-même : check silencieux côté Rust (updater.rs), on ne
+        // fait que récupérer l'objet Update complet ici (install reste manuel).
+        const unlistenUpdate = listen<{ version: string; notes?: string }>(
             "update-available",
             () => {
                 checkForUpdate().then(u => {
@@ -89,303 +138,246 @@
             },
         );
 
-        // Check silencieux séparé, côté Rust (dist_fetch.rs) : nouvelle
-        // version du CONTENU d'Abyss (nouveaux plugins, fixes...), pas de
-        // l'injecteur lui-même. N'installe jamais rien tout seul.
-        const unlistenBuildPromise = listen<{ sha: string }>(
+        // Contenu d'Abyss (patcher.js et consorts) : nouvelle version du
+        // cache local disponible.
+        const unlistenBuild = listen<{ sha: string }>(
             "abyss-build-update-available",
             () => {
                 buildUpdateAvailable = true;
             },
         );
 
+        // Dernier SHA distant connu, rafraîchi à CHAQUE lancement (voir
+        // dist_fetch::spawn_silent_check) — sans ça, aucune ligne ne pourrait
+        // jamais afficher "mettre à jour" avant un check manuel.
+        const unlistenLatestSha = listen<{ sha: string }>(
+            "latest-build-sha",
+            e => { latestBuildSha = e.payload.sha; },
+        );
+
+        const unlistenProgress = listen<InstallProgressEvent>(
+            "install-progress",
+            e => {
+                const { branch, step, status, message } = e.payload;
+                if (status === "error") {
+                    phases = { ...phases, [branch]: { kind: "error", message: message ?? "erreur inconnue" } };
+                } else {
+                    phases = { ...phases, [branch]: { kind: "installing", step } };
+                }
+            },
+        );
+
         return () => {
-            unlistenPromise.then(unlisten => unlisten());
-            unlistenBuildPromise.then(unlisten => unlisten());
+            unlistenUpdate.then(u => u());
+            unlistenBuild.then(u => u());
+            unlistenLatestSha.then(u => u());
+            unlistenProgress.then(u => u());
         };
     });
 </script>
 
-<main>
-    <header>
-        <h1>Abyss Injector</h1>
-        <nav>
-            <button class:active={tab === "home"} onclick={() => (tab = "home")}>
-                Accueil
-            </button>
-            <button class:active={tab === "settings"} onclick={() => (tab = "settings")}>
-                Réglages
-            </button>
-        </nav>
-    </header>
+<div class="shell">
+    <BlackHoleBackground
+        zoomedOut={screen !== "splash"}
+        darkened={screen !== "splash"}
+        blurred={screen !== "splash"}
+        lightBlur={screen === "splash"}
+        dimmed={anyInstalling}
+    />
+    <TitleBar
+        onBack={screen !== "splash" ? () => (screen = screen === "settings" ? screenBeforeSettings : "splash") : undefined}
+        onSettings={screen !== "settings"
+            ? () => {
+                  screenBeforeSettings = screen === "list" ? "list" : "splash";
+                  screen = "settings";
+              }
+            : undefined}
+    />
 
-    {#if pendingUpdate}
-        <UpdateBanner
-            version={pendingUpdate.version}
-            installing={installingUpdate}
-            onInstall={doInstallUpdate}
-        />
-    {/if}
+    <div class="content">
+        {#key screen}
+        <div class="screen-transition" in:fade={{ duration: 260 }} out:fade={{ duration: 160 }}>
+        {#if screen === "splash"}
+            <Splash onStart={() => (screen = "list")} />
+        {:else if screen === "settings"}
+            <Settings
+                {pendingUpdate}
+                {installingUpdate}
+                onCheckInjectorUpdate={checkInjectorUpdate}
+                onInstallInjectorUpdate={doInstallUpdate}
+            />
+        {:else}
+            <div class="list-screen">
+                <h2 class="brand">Abyss</h2>
 
-    {#if buildUpdateAvailable}
-        <div class="build-update-banner">
-            <span>Une nouvelle version d'Abyss est disponible.</span>
-            <button class="secondary" disabled={buildUpdating} onclick={updateAbyssBuild}>
-                {buildUpdating ? "Téléchargement…" : "Mettre à jour"}
-            </button>
-        </div>
-    {/if}
-
-    {#if error}
-        <p class="error">{error}</p>
-    {/if}
-
-    {#if tab === "home"}
-        <section class="installs">
-            {#if installs.length === 0}
-                <p class="empty">Aucune installation Discord détectée.</p>
-            {/if}
-
-            {#each installs as install (install.id)}
-                <div class="install-card">
-                    <div class="install-card__info">
-                        <strong class="branch">{install.branch}</strong>
-                        <span class="version">v{install.version}</span>
-                        <span class="status" class:patched={install.is_patched}>
-                            {install.is_patched ? "Patché" : "Non patché"}
-                        </span>
-                    </div>
-                    <button
-                        class="patch-btn"
-                        class:danger={install.is_patched}
-                        disabled={busyId === install.id}
-                        onclick={() => togglePatch(install)}
-                    >
-                        {#if busyId === install.id}
-                            …
-                        {:else if install.is_patched}
-                            Retirer Abyss
-                        {:else}
-                            Injecter Abyss
-                        {/if}
-                    </button>
-                </div>
-            {/each}
-
-            <button class="refresh" onclick={refreshInstalls}>Rafraîchir</button>
-        </section>
-    {:else}
-        <section class="settings">
-            <div class="build-block">
-                <p class="build-block__hint">
-                    Par défaut, Abyss Injector télécharge et met en cache le dernier build
-                    public d'Abyss (aucun repo ni Node requis). Clique ici pour forcer un
-                    rafraîchissement si tes amis n'ont pas la dernière version.
-                </p>
-                <button class="secondary" disabled={buildUpdating} onclick={updateAbyssBuild}>
-                    {buildUpdating ? "Téléchargement…" : "Mettre à jour le build Abyss"}
-                </button>
-                {#if buildMessage}
-                    <span class="build-block__msg">{buildMessage}</span>
+                {#if pendingUpdate}
+                    <UpdateBanner
+                        version={pendingUpdate.version}
+                        installing={installingUpdate}
+                        onInstall={doInstallUpdate}
+                    />
                 {/if}
+
+                {#if buildUpdateAvailable}
+                    <div class="banner">
+                        <span>Une nouvelle version d'Abyss est disponible.</span>
+                        <button disabled={buildUpdating} onclick={updateAbyssBuild}>
+                            {buildUpdating ? "Téléchargement…" : "Mettre à jour"}
+                        </button>
+                    </div>
+                {/if}
+
+                {#if globalError}
+                    <p class="error">{globalError}</p>
+                {/if}
+
+                <div class="rows-wrap">
+                    <div class="rows">
+                        {#each installs as install, i (install.branch)}
+                            <div class="row-enter" style={`animation-delay:${i * 45}ms`}>
+                                <DiscordRow
+                                    {install}
+                                    needsUpdate={needsUpdate(install)}
+                                    phase={phaseOf(install.branch)}
+                                    onInstall={() => runInstall(install)}
+                                    onUninstall={() => runUninstall(install)}
+                                    onConfirmUninstall={() => (phases = { ...phases, [install.branch]: { kind: "confirm-uninstall" } })}
+                                    onCancelConfirm={() => (phases = { ...phases, [install.branch]: { kind: "idle" } })}
+                                />
+                            </div>
+                        {/each}
+                    </div>
+                </div>
             </div>
-        </section>
-    {/if}
-</main>
+        {/if}
+        </div>
+        {/key}
+    </div>
+</div>
 
 <style>
-    main {
+    :global(html, body) {
+        background: #000;
+    }
+
+    .shell {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .content {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+    }
+
+    .screen-transition {
+        width: 100%;
+        height: 100%;
+    }
+
+    .list-screen {
         display: flex;
         flex-direction: column;
-        gap: 16px;
-        padding: 20px;
-        min-height: 100vh;
+        gap: 14px;
+        height: 100%;
+        padding: 64px 24px 24px;
+        box-sizing: border-box;
+        overflow-y: auto;
     }
 
-    header {
+    .brand {
+        margin: 0 0 4px;
+        font-family: "Anton", "Space Grotesk", sans-serif;
+        font-size: 22px;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+        transform: skewX(-8deg);
+        transform-origin: left center;
+        display: inline-block;
+        color: #fff;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
+    }
+
+    .rows-wrap {
+        position: relative;
+        margin-top: auto;
+        margin-bottom: auto;
+        width: 100%;
+        max-width: 560px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .row-enter {
+        animation: row-rise var(--duration-base) var(--ease-out) both;
+    }
+
+    @keyframes row-rise {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rows {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .banner {
         display: flex;
         align-items: center;
         justify-content: space-between;
-    }
-
-    h1 {
-        font-size: 16px;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: 0.02em;
-    }
-
-    nav {
-        display: flex;
-        gap: 4px;
-        background: var(--bg-elevated);
-        padding: 3px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-    }
-
-    nav button {
-        background: transparent;
-        border: none;
-        color: var(--text-dim);
-        padding: 6px 12px;
-        border-radius: 6px;
-        font-size: 12px;
-        cursor: pointer;
-    }
-
-    nav button.active {
-        background: rgba(255, 255, 255, 0.1);
-        color: var(--text);
-    }
-
-    .build-update-banner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 12px 16px;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: var(--bg-elevated);
+        gap: var(--space-4);
+        padding: var(--space-3) var(--space-4);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         font-size: 13px;
         color: var(--text);
+    }
+
+    .banner button {
+        background: transparent;
+        border: 1px solid var(--border-strong);
+        color: #fff;
+        padding: 7px 14px;
+        border-radius: var(--radius-sm);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background var(--duration-fast) var(--ease-out);
+    }
+
+    .banner button:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .banner button:disabled {
+        opacity: 0.6;
+        cursor: default;
     }
 
     .error {
         margin: 0;
-        padding: 10px 12px;
-        border-radius: 8px;
-        border: 1px solid rgba(229, 72, 77, 0.4);
-        background: rgba(229, 72, 77, 0.08);
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(237, 66, 69, 0.4);
+        background: rgba(237, 66, 69, 0.08);
         color: #ff8b8e;
         font-size: 12px;
-    }
-
-    .installs {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .empty {
-        color: var(--text-dim);
-        font-size: 13px;
-    }
-
-    .install-card {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px 14px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        background: var(--bg-elevated);
-    }
-
-    .install-card__info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 13px;
-    }
-
-    .branch {
-        text-transform: capitalize;
-    }
-
-    .version {
-        color: var(--text-dim);
-    }
-
-    .status {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        border: 1px solid var(--border-strong);
-        color: var(--text-dim);
-    }
-
-    .status.patched {
-        color: var(--ok);
-        border-color: rgba(74, 222, 128, 0.4);
-    }
-
-    .patch-btn {
-        background: #fff;
-        color: #0a0a0a;
-        border: none;
-        padding: 8px 14px;
-        border-radius: 7px;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .patch-btn.danger {
-        background: transparent;
-        color: var(--danger);
-        border: 1px solid rgba(229, 72, 77, 0.4);
-    }
-
-    .patch-btn:disabled {
-        opacity: 0.6;
-        cursor: default;
-    }
-
-    .refresh {
-        align-self: flex-start;
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim);
-        padding: 6px 12px;
-        border-radius: 7px;
-        font-size: 12px;
-        cursor: pointer;
-    }
-
-    .settings {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    .build-block {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 12px 14px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        background: var(--bg-elevated);
-    }
-
-    .build-block__hint {
-        margin: 0;
-        font-size: 12px;
-        color: var(--text-dim);
-        line-height: 1.5;
-    }
-
-    .build-block__msg {
-        font-size: 11px;
-        color: var(--ok);
-    }
-
-    button.secondary {
-        align-self: flex-start;
-        background: transparent;
-        border: 1px solid var(--border-strong);
-        color: var(--text);
-        padding: 7px 14px;
-        border-radius: 7px;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    button.secondary:disabled {
-        opacity: 0.6;
-        cursor: default;
     }
 </style>

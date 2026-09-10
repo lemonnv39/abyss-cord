@@ -1,0 +1,51 @@
+name: Release Injector
+
+# Build, signe et publie une Release GitHub pour l'injecteur (sous-projet
+# Tauri indépendant, voir injector/) à chaque tag "injector-vX.Y.Z" — c'est ce
+# que updater.rs vérifie au lancement / bouton "Vérifier les mises à jour"
+# des Réglages (endpoint pointé sur releases/latest/download/latest.json,
+# voir tauri.conf.json).
+#
+# Nécessite le secret de repo TAURI_SIGNING_PRIVATE_KEY (clé privée générée
+# via `pnpm tauri signer generate`, JAMAIS commit) — sans lui, tauri-action
+# ne peut pas signer le build et l'update ne sera pas vérifiable côté client.
+
+on:
+  push:
+    tags:
+      - "injector-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        working-directory: injector
+        run: pnpm install --no-frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: injector
+          tagName: ${{ github.ref_name }}
+          releaseName: "Abyss Injector ${{ github.ref_name }}"
+          releaseBody: "Voir CHANGELOG.md pour le détail des changements."
+          releaseDraft: false
+          prerelease: false

@@ -10,6 +10,24 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Added
+- `injector/` — full visual and functional redesign (v0.2.0): a black-hole
+  video background, a splash screen with a rotating tagline, a borderless
+  window with a custom macOS-style titlebar, and a fixed 3-row layout
+  (Discord/Canary/PTB) that replaces the old flat install-card list. Each
+  install now shows a live step-by-step progress narration during
+  patch/unpatch (cleaning up a foreign mod, environment checks, install,
+  restart) instead of a single spinner, and auto-detects/repairs installs
+  already patched by another Vencord-family mod (Vencord, Equicord...)
+  before patching with Abyss — no more needing that other mod's own
+  uninstaller first. Added a Settings screen: plugin-preset import/export
+  (reads/writes only the `plugins` key of Abyss's own `settings.json`, via
+  a native file picker), a "Fixer Abyss" repair action that detects and
+  re-downloads corrupted/incomplete injected build files, and a manual
+  "check for injector update" button. The injector's own self-update
+  (`tauri-plugin-updater`) is now backed by a real signing keypair and a
+  dedicated `release-injector.yml` GitHub Actions workflow that builds,
+  signs, and publishes a GitHub Release on every `injector-vX.Y.Z` tag —
+  previously a placeholder key meant this silently never worked.
 - `Cleaner` plugin: a single orchestrated panel to reset an account close to
   its original state — profile (avatar reset to Discord's own default,
   banner and profile color cleared, bio/pronouns/display name reset), clean

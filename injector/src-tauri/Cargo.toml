@@ -1,6 +1,6 @@
 [package]
 name = "abyss-injector"
-version = "0.1.0"
+version = "0.2.0"
 description = "Injecteur/patcheur pour Abyss (fork Vencord/Equicord) — projet Tauri indépendant"
 authors = ["lemonn"]
 edition = "2021"
@@ -12,6 +12,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# Sélecteur de fichiers natif (export/import des préréglages de plugins).
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Pour tuer le process Discord avant patch/unpatch (fichiers relâchés), sans
