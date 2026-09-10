@@ -1,10 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { listen } from "@tauri-apps/api/event";
-    import { getVersion } from "@tauri-apps/api/app";
     import type { Update } from "@tauri-apps/plugin-updater";
 
-    import ShinyButton from "./lib/components/ShinyButton.svelte";
     import UpdateBanner from "./lib/components/UpdateBanner.svelte";
     import { patcherApi } from "./lib/api/patcher";
     import { checkForUpdate, installUpdate } from "./lib/api/updater";
@@ -12,13 +10,10 @@
 
     let tab = $state<"home" | "settings">("home");
     let installs = $state<DiscordInstall[]>([]);
-    let repoPath = $state("");
     let busyId = $state<string | null>(null);
     let error = $state<string | null>(null);
-    let appVersion = $state("");
 
     let pendingUpdate = $state<Update | null>(null);
-    let checkingUpdate = $state(false);
     let installingUpdate = $state(false);
 
     let buildUpdating = $state(false);
@@ -33,15 +28,6 @@
         }
     }
 
-    async function loadSettings() {
-        const s = await patcherApi.getSettings();
-        repoPath = s.repo_path ?? "";
-    }
-
-    async function saveRepoPath() {
-        await patcherApi.saveSettings({ repo_path: repoPath || null });
-    }
-
     async function togglePatch(install: DiscordInstall) {
         error = null;
         busyId = install.id;
@@ -49,9 +35,9 @@
             if (install.is_patched) {
                 await patcherApi.unpatch(install.resources_path, install.branch);
             } else {
-                // repoPath vide -> l'injecteur télécharge le build public
+                // L'injecteur télécharge et met en cache le build public
                 // d'Abyss tout seul (voir dist_fetch.rs côté Rust).
-                await patcherApi.patch(install.resources_path, install.branch, repoPath);
+                await patcherApi.patch(install.resources_path, install.branch);
             }
             await refreshInstalls();
         } catch (e) {
@@ -76,23 +62,6 @@
         }
     }
 
-    async function manualCheck() {
-        checkingUpdate = true;
-        error = null;
-        try {
-            const update = await checkForUpdate();
-            if (update) {
-                pendingUpdate = update;
-            } else {
-                error = "Abyss Injector est déjà à jour.";
-            }
-        } catch (e) {
-            error = String(e);
-        } finally {
-            checkingUpdate = false;
-        }
-    }
-
     async function doInstallUpdate() {
         if (!pendingUpdate) return;
         installingUpdate = true;
@@ -106,8 +75,6 @@
 
     onMount(() => {
         refreshInstalls();
-        loadSettings();
-        getVersion().then(v => (appVersion = v));
 
         // Le check silencieux au lancement tourne côté Rust (updater.rs) ; il
         // se contente d'émettre cet event, jamais d'installer quoi que ce
@@ -221,24 +188,6 @@
                 {#if buildMessage}
                     <span class="build-block__msg">{buildMessage}</span>
                 {/if}
-            </div>
-
-            <label class="field">
-                <span>
-                    Dossier du repo Abyss — optionnel, pour tester un build local plutôt
-                    que le build public (contient dist/desktop/patcher.js après build)
-                </span>
-                <input
-                    type="text"
-                    bind:value={repoPath}
-                    onchange={saveRepoPath}
-                    placeholder="C:\Users\...\abyss-master (laisser vide sinon)"
-                />
-            </label>
-
-            <div class="update-check">
-                <ShinyButton state={checkingUpdate ? "loading" : "idle"} onClick={manualCheck} />
-                <span class="app-version">Abyss Injector v{appVersion}</span>
             </div>
         </section>
     {/if}
@@ -438,33 +387,5 @@
     button.secondary:disabled {
         opacity: 0.6;
         cursor: default;
-    }
-
-    .field {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        font-size: 12px;
-        color: var(--text-dim);
-    }
-
-    .field input {
-        background: var(--bg-elevated);
-        border: 1px solid var(--border);
-        color: var(--text);
-        padding: 8px 10px;
-        border-radius: 7px;
-        font-size: 12px;
-    }
-
-    .update-check {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .app-version {
-        font-size: 11px;
-        color: var(--text-dim);
     }
 </style>

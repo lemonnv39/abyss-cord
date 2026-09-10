@@ -244,30 +244,32 @@ function LocalInstallsTab() {
                 Ouvre l'appli, colle le script dans sa console (Ctrl+Shift+I), puis colle le résultat dans
                 l'onglet "Ajouter un token".
             </Forms.FormText>
-            <div className={cl("list")}>
-                {LOCAL_INSTALL_TARGETS.map(target => (
-                    <div key={target.label} className={cl("row")}>
-                        <div className={cl("row-info")}>
-                            <span className={cl("username")}>{target.label}</span>
-                            <span className={cl("token-hidden")}>Console → coller le script → copier le résultat</span>
+            <div className={cl("card")}>
+                <div className={cl("list")}>
+                    {LOCAL_INSTALL_TARGETS.map(target => (
+                        <div key={target.label} className={cl("row")}>
+                            <div className={cl("row-info")}>
+                                <span className={cl("username")}>{target.label}</span>
+                                <span className={cl("token-hidden")}>Console → coller le script → copier le résultat</span>
+                            </div>
+                            <div className={cl("row-actions")}>
+                                <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => openLocalInstall(target.branch, target.label)}>
+                                    Ouvrir
+                                </Button>
+                                <button
+                                    className={cl("icon-btn")}
+                                    title="Copier le script pour la console"
+                                    onClick={() => {
+                                        copyToClipboard(TOKEN_GRAB_SCRIPT);
+                                        Toasts.show({ message: "Script copié — colle-le dans la console de " + target.label, type: Toasts.Type.SUCCESS, id: Toasts.genId() });
+                                    }}
+                                >
+                                    <CopyIcon width={17} height={17} />
+                                </button>
+                            </div>
                         </div>
-                        <div className={cl("row-actions")}>
-                            <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => openLocalInstall(target.branch, target.label)}>
-                                Ouvrir
-                            </Button>
-                            <button
-                                className={cl("icon-btn")}
-                                title="Copier le script pour la console"
-                                onClick={() => {
-                                    copyToClipboard(TOKEN_GRAB_SCRIPT);
-                                    Toasts.show({ message: "Script copié — colle-le dans la console de " + target.label, type: Toasts.Type.SUCCESS, id: Toasts.genId() });
-                                }}
-                            >
-                                <CopyIcon width={17} height={17} />
-                            </button>
-                        </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -341,42 +343,44 @@ function SavedAccountsTab({ accounts, loaded, onRemove }: {
                 <CopyIcon width={16} height={16} /> Copier mon token actuel
             </Button>
 
-            {!loaded ? (
-                <Forms.FormText className={cl("empty")}>Chargement...</Forms.FormText>
-            ) : accounts.length === 0 ? (
-                <Forms.FormText className={cl("empty")}>Aucun compte — ajoute un token dans l'onglet "Ajouter un token".</Forms.FormText>
-            ) : (
-                <div className={cl("list")}>
-                    {accounts.map(a => (
-                        <div key={a.id} className={cl("row")}>
-                            <img className={cl("avatar")} src={avatarUrl(a)} alt="" />
-                            <div className={cl("row-info")}>
-                                <span className={cl("username")}>
-                                    {a.username}{a.discriminator && a.discriminator !== "0" ? `#${a.discriminator}` : ""}
-                                </span>
-                                <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>
+            <div className={cl("card")}>
+                {!loaded ? (
+                    <Forms.FormText className={cl("empty")}>Chargement...</Forms.FormText>
+                ) : accounts.length === 0 ? (
+                    <Forms.FormText className={cl("empty")}>Aucun compte — ajoute un token dans l'onglet "Ajouter un token".</Forms.FormText>
+                ) : (
+                    <div className={cl("list")}>
+                        {accounts.map(a => (
+                            <div key={a.id} className={cl("row")}>
+                                <img className={cl("avatar")} src={avatarUrl(a)} alt="" />
+                                <div className={cl("row-info")}>
+                                    <span className={cl("username")}>
+                                        {a.username}{a.discriminator && a.discriminator !== "0" ? `#${a.discriminator}` : ""}
+                                    </span>
+                                    <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>
+                                </div>
+                                <div className={cl("row-actions")}>
+                                    <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => switchToAccount(a.token)}>
+                                        Basculer
+                                    </Button>
+                                    <button className={cl("icon-btn")} title="Ouvrir dans une nouvelle fenêtre" onClick={() => openInStandaloneInstance(a)}>
+                                        <OpenExternalIcon width={17} height={17} />
+                                    </button>
+                                    <button className={cl("icon-btn")} title="Copier le token" onClick={() => {
+                                        copyToClipboard(a.token);
+                                        Toasts.show({ message: "Token copié", type: Toasts.Type.SUCCESS, id: Toasts.genId() });
+                                    }}>
+                                        <CopyIcon width={17} height={17} />
+                                    </button>
+                                    <button className={cl("icon-btn", "icon-btn--danger")} title="Supprimer" onClick={() => onRemove(a.id)}>
+                                        <DeleteIcon width={17} height={17} />
+                                    </button>
+                                </div>
                             </div>
-                            <div className={cl("row-actions")}>
-                                <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => switchToAccount(a.token)}>
-                                    Basculer
-                                </Button>
-                                <button className={cl("icon-btn")} title="Ouvrir dans une nouvelle fenêtre" onClick={() => openInStandaloneInstance(a)}>
-                                    <OpenExternalIcon width={17} height={17} />
-                                </button>
-                                <button className={cl("icon-btn")} title="Copier le token" onClick={() => {
-                                    copyToClipboard(a.token);
-                                    Toasts.show({ message: "Token copié", type: Toasts.Type.SUCCESS, id: Toasts.genId() });
-                                }}>
-                                    <CopyIcon width={17} height={17} />
-                                </button>
-                                <button className={cl("icon-btn", "icon-btn--danger")} title="Supprimer" onClick={() => onRemove(a.id)}>
-                                    <DeleteIcon width={17} height={17} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -432,35 +436,37 @@ function AddTokenTab({ onAdded }: { onAdded(accounts: SavedAccount[]): void; }) 
 
     return (
         <div className={cl("tab-content")}>
-            <Forms.FormText className={cl("hint")}>Colle un ou plusieurs de TES tokens Discord (un par ligne).</Forms.FormText>
-            <textarea
-                className={cl("textarea")}
-                value={paste}
-                onChange={e => handlePasteChange(e.currentTarget.value)}
-                placeholder="eyJhbGciOi... (un token par ligne)"
-                rows={5}
-            />
-            <div className={cl("add-footer")}>
-                <span className={cl("detected")}>{detected} token{detected !== 1 ? "s" : ""} détecté{detected !== 1 ? "s" : ""}</span>
-                <Button
-                    size={Button.Sizes.SMALL}
-                    color={Button.Colors.BRAND}
-                    disabled={checking || detected === 0}
-                    onClick={verifyAndAdd}
-                >
-                    {checking ? "Vérification..." : "Vérifier & ajouter"}
-                </Button>
-            </div>
-            {results.length > 0 && (
-                <div className={cl("results")}>
-                    {results.map((r, i) => (
-                        <div key={i} className={cl("result-row", r.status === "valid" ? "result-row--valid" : "result-row--invalid")}>
-                            {r.status === "valid" ? <CheckIcon /> : <CrossIcon />}
-                            <span>{r.status === "valid" ? r.username : "Token invalide"}</span>
-                        </div>
-                    ))}
+            <div className={cl("card")}>
+                <Forms.FormText className={cl("hint")}>Colle un ou plusieurs de TES tokens Discord (un par ligne).</Forms.FormText>
+                <textarea
+                    className={cl("textarea")}
+                    value={paste}
+                    onChange={e => handlePasteChange(e.currentTarget.value)}
+                    placeholder="eyJhbGciOi... (un token par ligne)"
+                    rows={5}
+                />
+                <div className={cl("add-footer")}>
+                    <span className={cl("detected")}>{detected} token{detected !== 1 ? "s" : ""} détecté{detected !== 1 ? "s" : ""}</span>
+                    <Button
+                        size={Button.Sizes.SMALL}
+                        color={Button.Colors.BRAND}
+                        disabled={checking || detected === 0}
+                        onClick={verifyAndAdd}
+                    >
+                        {checking ? "Vérification..." : "Vérifier & ajouter"}
+                    </Button>
                 </div>
-            )}
+                {results.length > 0 && (
+                    <div className={cl("results")}>
+                        {results.map((r, i) => (
+                            <div key={i} className={cl("result-row", r.status === "valid" ? "result-row--valid" : "result-row--invalid")}>
+                                {r.status === "valid" ? <CheckIcon /> : <CrossIcon />}
+                                <span>{r.status === "valid" ? r.username : "Token invalide"}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

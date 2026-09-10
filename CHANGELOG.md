@@ -10,6 +10,18 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Added
+- `Cleaner` plugin: a single orchestrated panel to reset an account close to
+  its original state — profile (avatar reset to Discord's own default,
+  banner and profile color cleared, bio/pronouns/display name reset), clean
+  own messages across every DM/group, close all DMs, leave all groups,
+  leave servers, and remove friends, each independently toggleable with
+  keep-lists for servers/friends. Runs everything in a fixed order
+  (messages before closing/leaving, so nothing gets cleaned out of reach),
+  with an 800ms delay and automatic 429-retry-with-backoff on every action
+  category, and a shared progress bar/status line. Does not touch or
+  replace `LeaveAllServers`/`ClearFriends`/`MessageCleaner` — fully
+  self-contained, duplicating only what it needs. Its dark flat-card look
+  (see Changed) is now the reference style for new Abyss plugin UIs.
 - Repo workspace reorg: `git init` safety net, this `CHANGELOG.md`,
   `version.json`, and a real `CLAUDE.md` (replacing the broken 6-byte stub).
 - `ImageToolkit` plugin: click an avatar/banner to enlarge it, right-click for
@@ -44,6 +56,18 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   (matches the mic-muted color).
 
 ### Changed
+- Unified UI theme: `Cleaner`'s flat dark look (solid `#313338`/`#2b2d31`
+  panels instead of Discord's own theme variables, indigo/red flat buttons,
+  dark search/input fields, Discord's own `ScrollerThin` instead of raw
+  `overflow-y` to avoid Chromium's default OS scrollbar) applied to
+  `TokenImporter`, `VoiceChannelSearch`, and `MessageLoggerEnhanced`'s log
+  modal — same visual language across every custom Abyss modal, function
+  unchanged.
+- Injector UI simplified further: removed the "Dossier du repo Abyss" field
+  (nobody but a developer testing a local build needs it — the app always
+  auto-downloads the public build otherwise) and the manual
+  "Vérifier les mises à jour" button/version line (the silent background
+  updater already covers this on its own).
 - `FollowUser`'s Fake Mute/Fake Deafen: switched from trying to cut real
   local audio (via `navigator.mediaDevices.getUserMedia` for mute — never
   fires on Desktop, whose voice pipeline goes through a native addon, not

@@ -1,27 +1,74 @@
+.vcs-root {
+    background: #313338;
+    overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.vcs-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.vcs-header-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(88, 101, 242, 0.2);
+    color: #5865f2;
+}
+
+.vcs-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.vcs-title {
+    margin: 0 !important;
+    display: flex;
+    align-items: center;
+    color: #ffffff !important;
+}
+
+.vcs-subtitle {
+    color: #b5bac1;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
 .vcs-count-badge {
     background: rgba(255, 255, 255, 0.08);
-    color: var(--text-muted);
+    color: #949ba4;
     font-size: 11px;
     font-weight: 700;
     padding: 1px 7px;
     border-radius: 10px;
-    margin-left: 4px;
+    margin-left: 8px;
 }
+
+/* ── Content ────────────────────────────────────────────────────────────── */
 
 .vcs-content {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     max-height: 60vh;
+    padding: 16px 20px !important;
 }
 
 .vcs-search-bar {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-radius: 8px;
-    background: var(--input-background);
+    background: #1e1f22;
+    border: 1px solid transparent;
     flex-shrink: 0;
 }
 
@@ -30,25 +77,40 @@
     background: transparent;
     border: none;
     outline: none;
-    color: var(--text-normal);
-    font-size: 14px;
+    color: #dbdee1;
+    font-size: 13px;
+}
+
+.vcs-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.35);
 }
 
 .vcs-search-clear {
     background: transparent;
     border: none;
-    color: var(--text-muted);
+    color: #949ba4;
     cursor: pointer;
     display: flex;
     align-items: center;
     padding: 2px;
 }
 
+.vcs-card {
+    background: #2b2d31;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 8px;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
 .vcs-channel-list {
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    height: 100%;
+    max-height: 44vh;
 }
 
 .vcs-row {
@@ -58,11 +120,13 @@
     padding: 8px 10px;
     border-radius: 6px;
     cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid transparent;
     transition: background 0.1s;
 }
 
 .vcs-row:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .vcs-row--locked {
@@ -74,6 +138,7 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
+    color: #949ba4;
 }
 
 .vcs-info {
@@ -85,8 +150,8 @@
 
 .vcs-name {
     font-size: 14px;
-    font-weight: 500;
-    color: var(--text-normal);
+    font-weight: 600;
+    color: #dbdee1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -97,7 +162,7 @@
     align-items: center;
     gap: 5px;
     font-size: 12px;
-    color: var(--text-muted);
+    color: #949ba4;
 }
 
 .vcs-guild-icon {
@@ -126,32 +191,37 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    border: 1px solid var(--background-primary);
+    border: 1px solid #2b2d31;
     margin-left: -4px;
 }
 
 .vcs-join-btn {
-    background: var(--brand-500, #5865f2);
+    background: #5865f2;
     color: #fff;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
-    padding: 4px 10px;
+    padding: 5px 12px;
     cursor: pointer;
     flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+.vcs-join-btn:hover {
+    background: #4752c4;
 }
 
 .vcs-locked-label,
 .vcs-joining-label {
     font-size: 11px;
-    color: var(--text-muted);
+    color: #949ba4;
     flex-shrink: 0;
 }
 
 .vcs-empty {
     text-align: center;
-    color: var(--text-muted);
+    color: #949ba4;
+    font-size: 12px;
     padding: 24px;
 }
 
@@ -161,7 +231,7 @@
     align-items: center;
     gap: 10px;
     padding: 40px;
-    color: var(--text-muted);
+    color: #949ba4;
 }
 
 @keyframes vcs-spin {

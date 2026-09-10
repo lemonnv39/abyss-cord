@@ -6,6 +6,7 @@
 
 .vc-tokenimporter-root {
     overflow-x: hidden;
+    background: #313338;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
@@ -20,14 +21,13 @@
 .vc-tokenimporter-header-icon {
     width: 40px;
     height: 40px;
-    border-radius: 12px;
+    border-radius: 10px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--brand-500), var(--brand-560, var(--brand-500)));
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(88, 101, 242, 0.35);
+    background: rgba(88, 101, 242, 0.2);
+    color: #5865f2;
 }
 
 .vc-tokenimporter-header-text {
@@ -37,20 +37,21 @@
 
 .vc-tokenimporter-title {
     margin: 0 !important;
-    font-size: 18px !important;
+    font-size: 16px !important;
+    color: #ffffff !important;
 }
 
 .vc-tokenimporter-subtitle {
-    color: var(--text-muted);
-    font-size: 13px;
+    color: #b5bac1;
+    font-size: 12px;
     margin-top: 2px;
 }
 
 /* ── Tab bar ────────────────────────────────────────────────────────────── */
 
 .vc-tokenimporter-tab-bar {
-    border-bottom: 1px solid var(--border-subtle);
-    margin: 0 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 0 20px;
     display: flex;
     align-items: stretch;
     flex-direction: row;
@@ -60,42 +61,52 @@
 
 .vc-tokenimporter-tab {
     border-bottom: 2px solid transparent;
-    color: var(--interactive-normal);
+    color: #949ba4;
     cursor: pointer;
     padding: 10px 2px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
     transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .vc-tokenimporter-tab:where(.vc-tokenimporter-selected, :hover, :focus) {
-    color: var(--interactive-active);
-    border-bottom-color: var(--brand-500);
+    color: #ffffff;
+    border-bottom-color: #5865f2;
 }
 
 /* ── Content ────────────────────────────────────────────────────────────── */
 
 .vc-tokenimporter-content {
-    padding: 0 24px 24px !important;
+    padding: 16px 20px 20px !important;
     max-height: 60vh;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
 .vc-tokenimporter-tab-content {
-    padding: 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     min-width: 0;
 }
 
+.vc-tokenimporter-card {
+    background: #2b2d31;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 14px;
+}
+
 .vc-tokenimporter-empty {
-    color: var(--text-muted);
-    padding: 40px 0;
+    color: #949ba4;
+    padding: 24px 0;
     text-align: center;
+    font-size: 12px;
 }
 
 .vc-tokenimporter-my-token-btn {
-    margin-bottom: 16px;
+    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -114,25 +125,23 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: var(--background-secondary);
-    border: 1px solid transparent;
+    padding: 9px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid transparent;
     min-width: 0;
-    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    transition: background 0.15s ease;
 }
 
 .vc-tokenimporter-row:hover {
-    background: var(--background-modifier-hover);
-    border-color: var(--border-subtle);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .vc-tokenimporter-avatar {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     flex-shrink: 0;
-    box-shadow: 0 0 0 2px var(--background-secondary);
 }
 
 .vc-tokenimporter-row-info {
@@ -144,18 +153,18 @@
 }
 
 .vc-tokenimporter-username {
-    color: var(--header-primary);
+    color: #dbdee1;
     font-weight: 600;
-    font-size: 15px;
+    font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .vc-tokenimporter-token-hidden {
-    color: var(--text-muted);
-    font-size: 12px;
-    letter-spacing: 2px;
+    color: #949ba4;
+    font-size: 11px;
+    letter-spacing: 1.5px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -171,52 +180,55 @@
 .vc-tokenimporter-icon-btn {
     background: none;
     border: none;
-    color: var(--interactive-normal);
+    color: #b5bac1;
     cursor: pointer;
     padding: 7px;
     border-radius: 6px;
     display: flex;
     align-items: center;
-    transition: color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+    transition: color 0.12s ease, background 0.12s ease;
 }
 
 .vc-tokenimporter-icon-btn:hover {
-    color: var(--interactive-hover);
-    background: var(--background-modifier-selected);
-    transform: translateY(-1px);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .vc-tokenimporter-icon-btn--danger:hover {
-    color: var(--text-danger);
+    color: #ed4245;
 }
 
 /* ── "Ajouter un token" ─────────────────────────────────────────────────── */
 
 .vc-tokenimporter-hint {
     margin-bottom: 10px;
-    color: var(--text-muted);
+    color: #949ba4;
+    font-size: 12px;
 }
 
 .vc-tokenimporter-textarea {
     width: 100%;
-    min-height: 110px;
+    min-height: 100px;
     max-width: 100%;
     box-sizing: border-box;
-    background: var(--input-background);
-    color: var(--text-normal);
-    border: 1px solid var(--background-modifier-accent);
-    border-radius: 10px;
+    background: #1e1f22;
+    color: #dbdee1;
+    border: 1px solid transparent;
+    border-radius: 8px;
     padding: 12px;
     font-family: var(--font-code);
     font-size: 13px;
     resize: vertical;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.15s ease;
+}
+
+.vc-tokenimporter-textarea::placeholder {
+    color: rgba(255, 255, 255, 0.3);
 }
 
 .vc-tokenimporter-textarea:focus {
     outline: none;
-    border-color: var(--brand-500);
-    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
+    border-color: #5865f2;
 }
 
 .vc-tokenimporter-add-footer {
@@ -229,12 +241,12 @@
 }
 
 .vc-tokenimporter-detected {
-    color: var(--text-muted);
+    color: #949ba4;
     font-size: 12px;
 }
 
 .vc-tokenimporter-results {
-    margin-top: 16px;
+    margin-top: 14px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -247,13 +259,14 @@
     font-size: 13px;
     padding: 8px 10px;
     border-radius: 8px;
-    background: var(--background-secondary);
+    background: rgba(255, 255, 255, 0.03);
+    color: #dbdee1;
 }
 
 .vc-tokenimporter-result-row--valid {
-    color: var(--text-positive);
+    color: #23a55a;
 }
 
 .vc-tokenimporter-result-row--invalid {
-    color: var(--text-danger);
+    color: #ed4245;
 }

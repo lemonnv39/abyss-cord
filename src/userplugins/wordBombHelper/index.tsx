@@ -5,12 +5,12 @@
  */
 
 /*
- * WordBombHelper — ported from Nightcord's wordBomb plugin, their later
- * standalone-window version (see native.ts's header for the full
- * rundown): a real separate, frameless, always-on-top BrowserWindow
- * (panel.html) rather than a React overlay inside Discord's own window.
- * This file is now just the toggle button — all the actual UI lives in
- * panel.html, and the typing/window-management logic lives in native.ts.
+ * WordBombHelper — porté directement du "WordBomb" de Nightcord (leur
+ * version standalone-window construite dans src/main/ipcMain.ts, pas leur
+ * WordBombOverlay.tsx in-page). Ce fichier n'est que le bouton d'ouverture —
+ * toute l'UI vit dans panel.html, toute la logique de frappe/fenêtre dans
+ * native.ts (voir son en-tête pour le détail du portage et ce qui a été
+ * volontairement exclu : StreamProof, définitions IA).
  */
 
 import { HeaderBarButton } from "@api/HeaderBar";
@@ -50,7 +50,7 @@ function WordBombHelperButton() {
 export default definePlugin({
     name: "WordBombHelper",
     enabledByDefault: false,
-    description: "WordBomb assistant in its own draggable window: tracks which letters you haven't used, auto-picks the best word for the letters you're given, and types it for real at a speed and human-like typo rate you control (settings persist between sessions). Click into WordBomb's own text field first — the sequence also clicks the window's center itself to help focus land right, but it doesn't reach into the game itself.",
+    description: "WordBomb assistant in its own draggable window, ported from Nightcord: tracks which letters you haven't used, auto-picks the best word for the letters you're given, and types it for real at a speed and human-like typo rate you control (settings persist between sessions). Click into WordBomb's own text field first — the sequence also clicks the window's center itself to help focus land right, but it doesn't reach into the game itself.",
     authors: [{ name: "0ctane", id: 0n }],
 
     headerBarButton: {

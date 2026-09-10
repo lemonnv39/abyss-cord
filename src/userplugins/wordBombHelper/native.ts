@@ -5,32 +5,24 @@
  */
 
 /*
- * Ported from Nightcord's wordBomb plugin: not the older React-in-page
- * overlay, but their more complete later version built straight into
- * ipcMain.ts — a genuinely separate, frameless, always-on-top BrowserWindow
- * loading a small standalone HTML page (panel.html), rather than a portal
- * rendered inside Discord's own window.
+ * Port direct du "WordBomb" de Nightcord tel qu'il vit dans leur
+ * src/main/ipcMain.ts (handler WORLD_BOMB_SEQUENCE / WORLD_BOMB_OPEN_WINDOW),
+ * pas de leur WordBombOverlay.tsx (le portail React in-page plus simple,
+ * actuellement branché chez eux mais moins complet) — architecture identique
+ * à ce qu'on avait déjà construit : fenêtre Electron séparée, sans cadre,
+ * toujours au-dessus, chargeant panel.html.
  *
- * Typing still goes through System.Windows.Forms.SendKeys at the real OS
- * message-queue level (see typeWord below) — same reasoning as before,
- * that's what reaches a sandboxed Activity iframe like a genuine keypress.
- * Also ported: SetForegroundWindow + a click at the window's center happen
- * FIRST, and there's a "humanChance" typo simulator (type a wrong key,
- * pause, backspace, pause, then the real one).
+ * Deux choses volontairement PAS portées, comme convenu :
+ *   - StreamProof (setContentProtection) : combiné à de l'automatisation
+ *     clavier, ce pattern se fait bloquer par le classifieur de sécurité de
+ *     Claude Code — on l'a déjà retiré une fois pour cette raison.
+ *   - Les définitions IA (Groq) : nécessite une clé API externe qu'on n'a
+ *     pas et que l'utilisateur a explicitement exclues ("sauf Définitions").
  *
- * One focus subtlety Nightcord's code explicitly handles, ported here too:
- * once the helper is its own window, clicking its "FIND" button makes
- * *that* window the OS-focused one — so if we typed into "whatever's
- * focused" we'd type into our own panel, not Discord. typeWord checks
- * whether the caller is our own panel window and, if so, retargets to the
- * other (Discord) window instead.
- *
- * Not ported: Nightcord's Groq-API word definitions ("Safe Mode" — needs
- * an API key we don't have) and their StreamProof screen-capture-hiding
- * toggle (setContentProtection combined with input automation is exactly
- * the pattern a stealth-control tool looks like, and got this file blocked
- * by Claude Code's own safety classifier on a prior attempt — dropped at
- * the user's own choice after that).
+ * La saisie passe par System.Windows.Forms.SendKeys au niveau du vrai
+ * message-queue OS (voir typeWord) — seule façon fiable d'atteindre un
+ * salon WordBomb qui tourne dans une iframe Discord Activity sandboxée ;
+ * Electron sendInputEvent ne suffit pas pour ça.
  */
 
 import { BrowserWindow, screen } from "electron";
@@ -59,8 +51,8 @@ function runPowershellScript(psScript: string): Promise<void> {
 
     return new Promise<void>((resolve, reject) => {
         try {
-            // BOM so PowerShell reads the script as UTF-8 — needed for
-            // accented French characters typed via SendKeys.
+            // BOM pour que PowerShell lise le script en UTF-8 — nécessaire
+            // pour les caractères accentués français tapés via SendKeys.
             writeFileSync(tempFile, "﻿" + psScript, "utf8");
             const child = spawn("powershell.exe", [
                 "-NoProfile", "-ExecutionPolicy", "Bypass",
@@ -85,6 +77,10 @@ function runPowershellScript(psScript: string): Promise<void> {
     });
 }
 
+// Port fidèle de WORLD_BOMB_SEQUENCE (ipcMain.ts) : focus la fenêtre cible,
+// clique en son centre, puis tape le mot caractère par caractère avec une
+// chance configurable de faute de frappe simulée (mauvaise touche, pause,
+// backspace, pause, bonne touche).
 export async function typeWord(
     event: Electron.IpcMainInvokeEvent,
     word: string,
@@ -95,39 +91,30 @@ export async function typeWord(
         if (process.platform !== "win32") {
             return { ok: false, error: "Windows only" };
         }
-        // Our word list is filtered to plain alphabetic French words only
-        // (see words.json generation), so there's no SendKeys special
-        // syntax (+^%~(){}[]) to worry about escaping.
-        if (!/^[a-zàâäéèêëïîôöùûüÿçœæ]+$/i.test(word)) {
-            return { ok: false, error: "Word contains unexpected characters" };
+        if (!/^[\x20-\x7E]+$/.test(word)) {
+            return { ok: false, error: "Word contains disallowed characters" };
         }
 
         const safeLps = Math.max(1, Math.min(100, lps));
         const safeHumanChance = Math.max(0, Math.min(100, humanChance));
 
-        // Retarget away from our own panel window (see file header).
+        // Retarget hors de notre propre fenêtre panel (voir en-tête du fichier).
         let targetWindow = BrowserWindow.fromWebContents(event.sender);
         if (panelWindow && targetWindow === panelWindow) {
             targetWindow = BrowserWindow.getAllWindows().find(w => w !== panelWindow && !w.isDestroyed()) ?? null;
         }
 
         let hwnd = 0;
-        let centerX: number;
-        let centerY: number;
-
         if (targetWindow) {
             try {
                 const handleBuf = targetWindow.getNativeWindowHandle();
                 if (handleBuf && handleBuf.length >= 4) hwnd = handleBuf.readInt32LE(0);
-            } catch { /* fall through with hwnd = 0 */ }
-            const b = targetWindow.getBounds();
-            centerX = Math.round(b.x + b.width / 2);
-            centerY = Math.round(b.y + b.height / 2);
-        } else {
-            const point = screen.getCursorScreenPoint();
-            centerX = point.x;
-            centerY = point.y;
+            } catch { /* fall through avec hwnd = 0 */ }
         }
+
+        const bounds = targetWindow?.getBounds() ?? screen.getPrimaryDisplay().workArea;
+        const centerX = Math.round(bounds.x + bounds.width / 2);
+        const centerY = Math.round(bounds.y + bounds.height / 2);
 
         const minMs = Math.max(10, Math.round(1000 / (safeLps * 1.5)));
         const maxMs = Math.max(minMs + 1, Math.round(1000 / safeLps));
@@ -164,8 +151,7 @@ export async function typeWord(
             lines.push(`  Start-Sleep -Milliseconds (Get-Random -Minimum ${minMs} -Maximum ${maxMs})`);
         }
 
-        // Raw keybd_event for Enter (VK_RETURN = 0x0D) instead of SendKeys'
-        // {ENTER} — matches Nightcord's version, functionally equivalent.
+        // keybd_event brut pour Entrée (VK_RETURN = 0x0D) — identique à Nightcord.
         lines.push(
             "  [Abyss.WinAPI]::keybd_event(0x0D, 0x1C, 0, [UIntPtr]::Zero)",
             "  Start-Sleep -Milliseconds 20",
@@ -180,7 +166,7 @@ export async function typeWord(
     }
 }
 
-// ── Standalone panel window ─────────────────────────────────────────────────
+// ── Fenêtre panel autonome ───────────────────────────────────────────────────
 
 function preloadPath(): string {
     const dir = join(tmpdir(), "abyss-wbh-preload");
@@ -192,7 +178,6 @@ function preloadPath(): string {
             'contextBridge.exposeInMainWorld("wbhAPI", {',
             '  typeWord: (word, lps, humanChance) => ipcRenderer.invoke("VencordPluginNative_WordBombHelper_typeWord", word, lps, humanChance),',
             '  closeWindow: () => ipcRenderer.invoke("VencordPluginNative_WordBombHelper_closeWindow"),',
-            '  resize: (w, h) => ipcRenderer.invoke("VencordPluginNative_WordBombHelper_resizeWindow", w, h),',
             "});",
         ].join("\n"), "utf-8");
     } catch { /* best effort */ }
@@ -207,13 +192,12 @@ export async function openWindow(_: any): Promise<{ status: "opened" | "closed";
     }
 
     panelWindow = new BrowserWindow({
-        // Tall enough for the settings view (LPS/typo sliders, theme
-        // input, play style dropdown, checkbox, back button) without
-        // needing a dynamic resize — a previous version tried resizing the
-        // window on view toggle via IPC, but that round-trip silently
-        // failing left the settings view rendered-but-clipped inside a
-        // window still sized for the home view, which looked exactly like
-        // "the settings page doesn't open." Fixed height avoids that.
+        // Hauteur fixe suffisante pour la vue accueil ET réglages sans
+        // dépendre d'un resize dynamique via IPC — Nightcord utilise
+        // window.worldBombAPI.resize(...) sur chaque bascule de vue, mais on
+        // a déjà eu ce bug une fois ici : un round-trip IPC silencieusement
+        // raté laisse la vue réglages rendue-mais-coupée dans une fenêtre
+        // encore dimensionnée pour l'accueil. Hauteur fixe = pas de round-trip.
         width: 326,
         height: 440,
         transparent: true,
@@ -244,11 +228,4 @@ export function closeWindow(_: any) {
         panelWindow.close();
     }
     panelWindow = null;
-}
-
-export function resizeWindow(_: any, width: number, height: number) {
-    if (!panelWindow || panelWindow.isDestroyed()) return;
-    const safeW = Math.max(200, Math.min(800, Math.round(width)));
-    const safeH = Math.max(100, Math.min(800, Math.round(height)));
-    panelWindow.setSize(safeW, safeH);
 }

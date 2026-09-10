@@ -7,12 +7,13 @@
 import { BaseText } from "@components/BaseText";
 import { Button } from "@components/Button";
 import { Flex } from "@components/Flex";
-import { InfoIcon } from "@components/Icons";
+import { InfoIcon, LogsIcon } from "@components/Icons";
 import { copyWithToast, openUserProfile } from "@utils/discord";
+import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot } from "@utils/modal";
 import { LazyComponent } from "@utils/react";
 import { RenderModalProps, type User } from "@vencord/discord-types";
 import { find, findByCode, findByCodeLazy } from "@webpack";
-import { Alerts, ChannelStore, closeAllModals, ContextMenuApi, FluxDispatcher, GuildStore, Menu, Modal, NavigationRouter, openModal, React, TabBar, TextInput, Tooltip, useMemo, useRef, useState } from "@webpack/common";
+import { Alerts, ChannelStore, closeAllModals, ContextMenuApi, FluxDispatcher, GuildStore, Menu, NavigationRouter, openModal, React, ScrollerThin, TabBar, TextInput, Tooltip, useMemo, useRef, useState } from "@webpack/common";
 
 import { DBMessageRecord, deleteMessageIDB, deleteMessagesBulkIDB } from "../db";
 import { cl, clearLogs, settings } from "../index";
@@ -74,64 +75,102 @@ export function LogsModal({ modalProps, initalQuery }: Props) {
     const { messages, total, statusTotal, pending, reset } = useMessages(queryEh, currentTab, sortNewest, numDisplayedMessages);
 
     return (
-        <Modal
-            {...modalProps}
-            size="lg"
-            title={
-                <div className={cl("modal")}>
-                    <TabBar
-                        type="top"
-                        look="brand"
-                        className={cl("modal-tab-bar")}
-                        selectedItem={currentTab}
-                        onItemSelect={e => {
-                            setCurrentTab(e);
-                            setNumDisplayedMessages(settings.store.messagesToDisplayAtOnceInLogs);
-                            contentRef.current?.firstElementChild?.scrollTo(0, 0);
-                        }}
-                    >
-                        <TabBar.Item
-                            className={cl("modal-tab-bar-item")}
-                            id={LogTabs.DELETED}
-                        >
-                            Deleted
-                        </TabBar.Item>
-                        <TabBar.Item
-                            className={cl("modal-tab-bar-item")}
-                            id={LogTabs.EDITED}
-                        >
-                            Edited
-                        </TabBar.Item>
-                        <TabBar.Item
-                            className={cl("modal-tab-bar-item")}
-                            id={LogTabs.GHOST_PING}
-                        >
-                            Ghost Pinged
-                        </TabBar.Item>
-                    </TabBar>
-                    <div className={cl("modal-filter")}>
-                        <TextInput value={queryEh} onChange={e => setQuery(e)} placeholder="Filter Messages" />
-                    </div>
+        <ModalRoot {...modalProps} size="large" className={cl("root")}>
+            <ModalHeader separator={false} className={cl("header")}>
+                <div className={cl("header-icon")}><LogsIcon width={20} height={20} /></div>
+                <div className={cl("header-text")}>
+                    <BaseText size="lg" className={cl("title")}>Message Logger</BaseText>
+                    <BaseText size="sm" className={cl("subtitle")}>Messages supprimés, modifiés et ghost pings.</BaseText>
                 </div>
-            }
-            actions={[
-                {
-                    text: `Sort ${sortNewest ? "Oldest First" : "Newest First"}`,
-                    variant: "secondary",
-                    onClick: () => {
+                <ModalCloseButton onClick={modalProps.onClose} />
+            </ModalHeader>
+
+            <div className={cl("toolbar")}>
+                <TabBar
+                    type="top"
+                    look="brand"
+                    className={cl("modal-tab-bar")}
+                    selectedItem={currentTab}
+                    onItemSelect={e => {
+                        setCurrentTab(e);
+                        setNumDisplayedMessages(settings.store.messagesToDisplayAtOnceInLogs);
+                        contentRef.current?.firstElementChild?.scrollTo(0, 0);
+                    }}
+                >
+                    <TabBar.Item
+                        className={cl("modal-tab-bar-item")}
+                        id={LogTabs.DELETED}
+                    >
+                        Deleted
+                    </TabBar.Item>
+                    <TabBar.Item
+                        className={cl("modal-tab-bar-item")}
+                        id={LogTabs.EDITED}
+                    >
+                        Edited
+                    </TabBar.Item>
+                    <TabBar.Item
+                        className={cl("modal-tab-bar-item")}
+                        id={LogTabs.GHOST_PING}
+                    >
+                        Ghost Pinged
+                    </TabBar.Item>
+                </TabBar>
+                <div className={cl("modal-filter")}>
+                    <TextInput value={queryEh} onChange={e => setQuery(e)} placeholder="Filter Messages" />
+                </div>
+            </div>
+
+            <ModalContent className={cl("content")}>
+                <ScrollerThin fade className={cl("scroller")}>
+                    <div className={cl("card")}>
+                        <div style={{ opacity: modalProps.transitionState === 1 ? "1" : "0" }} className={`${cl("modal-content-container")} ${cl("modal-root")}`} ref={contentRef}>
+                            {
+                                modalProps.transitionState === 1 &&
+                                <div>
+                                    {messages != null && total === 0 && (
+                                        <EmptyLogs
+                                            hasQuery={queryEh.length !== 0}
+                                            reset={reset}
+                                        />
+                                    )}
+
+                                    {!pending && messages != null && (
+                                        <LogsContentMemo
+                                            visibleMessages={messages}
+                                            canLoadMore={messages.length < statusTotal && messages.length >= settings.store.messagesToDisplayAtOnceInLogs}
+                                            tab={currentTab}
+                                            sortNewest={sortNewest}
+                                            reset={reset}
+                                            handleLoadMore={() => setNumDisplayedMessages(e => e + settings.store.messagesToDisplayAtOnceInLogs)}
+                                        />
+                                    )}
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </ScrollerThin>
+            </ModalContent>
+
+            <ModalFooter className={cl("footer")}>
+              <div className={cl("footer-inner")}>
+                <button
+                    className={cl("btn", "btn--secondary")}
+                    onClick={() => {
                         setSortNewest(e => {
                             const val = !e;
                             settings.store.sortNewest = val;
                             return val;
                         });
                         contentRef.current?.firstElementChild?.scrollTo(0, 0);
-                    }
-                },
-                {
-                    text: "Clear Visible Logs",
-                    variant: "critical-secondary",
-                    disabled: messages?.length === 0,
-                    onClick: () => Alerts.show({
+                    }}
+                >
+                    Sort {sortNewest ? "Oldest First" : "Newest First"}
+                </button>
+                <button
+                    className={cl("btn", "btn--stop")}
+                    disabled={messages?.length === 0}
+                    onClick={() => Alerts.show({
                         title: "Clear Logs",
                         body: `Are you sure you want to clear ${messages.length} logs`,
                         confirmText: "Clear",
@@ -141,12 +180,13 @@ export function LogsModal({ modalProps, initalQuery }: Props) {
                             await deleteMessagesBulkIDB(messages.map(e => e.message_id));
                             reset();
                         }
-                    })
-                },
-                {
-                    text: "Clear All Logs",
-                    variant: "critical-primary",
-                    onClick: () => Alerts.show({
+                    })}
+                >
+                    Clear Visible Logs
+                </button>
+                <button
+                    className={cl("btn", "btn--danger")}
+                    onClick={() => Alerts.show({
                         title: "Clear Logs",
                         body: "Are you sure you want to clear all the logs",
                         confirmText: "Clear",
@@ -156,35 +196,13 @@ export function LogsModal({ modalProps, initalQuery }: Props) {
                             await clearLogs();
                             reset();
                         }
-                    })
-                }
-            ]}
-        >
-            <div style={{ opacity: modalProps.transitionState === 1 ? "1" : "0" }} className={`${cl("modal-content-container")} ${cl("modal-root")}`} ref={contentRef}>
-                {
-                    modalProps.transitionState === 1 &&
-                    <div>
-                        {messages != null && total === 0 && (
-                            <EmptyLogs
-                                hasQuery={queryEh.length !== 0}
-                                reset={reset}
-                            />
-                        )}
-
-                        {!pending && messages != null && (
-                            <LogsContentMemo
-                                visibleMessages={messages}
-                                canLoadMore={messages.length < statusTotal && messages.length >= settings.store.messagesToDisplayAtOnceInLogs}
-                                tab={currentTab}
-                                sortNewest={sortNewest}
-                                reset={reset}
-                                handleLoadMore={() => setNumDisplayedMessages(e => e + settings.store.messagesToDisplayAtOnceInLogs)}
-                            />
-                        )}
-                    </div>
-                }
-            </div>
-        </Modal>
+                    })}
+                >
+                    Clear All Logs
+                </button>
+              </div>
+            </ModalFooter>
+        </ModalRoot>
     );
 }
 

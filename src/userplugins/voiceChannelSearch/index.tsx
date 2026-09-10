@@ -10,7 +10,7 @@ import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { ChannelStore, Forms, GuildChannelStore, GuildStore, IconUtils, React, useEffect, useMemo, useRef, UserStore, useState, VoiceStateStore } from "@webpack/common";
+import { ChannelStore, Forms, GuildChannelStore, GuildStore, IconUtils, React, ScrollerThin, useEffect, useMemo, useRef, UserStore, useState, VoiceStateStore } from "@webpack/common";
 
 const ChannelActions = findByPropsLazy("selectVoiceChannel", "selectChannel");
 
@@ -158,12 +158,16 @@ function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: V
     const count = displayList?.length ?? 0;
 
     return (
-        <ModalRoot {...rootProps} size="medium">
-            <ModalHeader separator={false}>
-                <Forms.FormTitle tag="h4" style={{ margin: 0, display: "flex", alignItems: "center", gap: 8, color: "#ffffff" }}>
-                    <SearchIcon width={16} height={16} /> Voice Channels
-                    {displayList !== null && <span className="vcs-count-badge">{count}</span>}
-                </Forms.FormTitle>
+        <ModalRoot {...rootProps} size="medium" className="vcs-root">
+            <ModalHeader separator={false} className="vcs-header">
+                <div className="vcs-header-icon"><SearchIcon width={20} height={20} /></div>
+                <div className="vcs-header-text">
+                    <Forms.FormTitle tag="h4" className="vcs-title">
+                        Voice Channels
+                        {displayList !== null && <span className="vcs-count-badge">{count}</span>}
+                    </Forms.FormTitle>
+                    <Forms.FormText className="vcs-subtitle">Cherche et rejoins n'importe quel salon vocal de tes serveurs.</Forms.FormText>
+                </div>
                 <ModalCloseButton onClick={rootProps.onClose} />
             </ModalHeader>
             <ModalContent className="vcs-content">
@@ -192,55 +196,57 @@ function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: V
                                 </button>
                             )}
                         </div>
-                        <div className="vcs-channel-list">
-                            {displayList!.length === 0 && (
-                                <div className="vcs-empty">{query ? "No channel found" : "No voice channels"}</div>
-                            )}
-                            {displayList!.slice(0, 150).map(ch => (
-                                <div key={ch.channelId}
-                                    className={`vcs-row${ch.canAccess ? "" : " vcs-row--locked"}`}
-                                    onClick={() => ch.canAccess && join(ch)}
-                                    title={ch.canAccess ? undefined : "No permission to join this channel"}
-                                >
-                                    <span className="vcs-icon">
-                                        {ch.canAccess
-                                            ? (ch.channelType === 13 ? <StageIcon /> : <VoiceIcon />)
-                                            : <span style={{ opacity: 0.5, fontSize: 13 }}>🔒</span>
-                                        }
-                                    </span>
-                                    <div className="vcs-info">
-                                        <span className="vcs-name">{ch.channelName}</span>
-                                        <div className="vcs-guild">
-                                            {ch.guildIcon && <img src={ch.guildIcon} className="vcs-guild-icon" alt="" loading="lazy" />}
-                                            <span className="vcs-guild-name">{ch.guildName}</span>
-                                            {ch.memberCount > 0 && (
-                                                <div className="vcs-members-info">
-                                                    <span className="vcs-members-count"> · {ch.memberCount}</span>
-                                                    <div className="vcs-member-avatars">
-                                                        {ch.memberIds?.map((uId: string) => {
-                                                            const user = UserStore.getUser(uId);
-                                                            if (!user) return null;
-                                                            const avatarUrl = user.getAvatarURL(ch.guildId, 16);
-                                                            return <img key={uId} src={avatarUrl} className="vcs-member-avatar" />;
-                                                        })}
+                        <div className="vcs-card">
+                            <ScrollerThin fade className="vcs-channel-list">
+                                {displayList!.length === 0 && (
+                                    <div className="vcs-empty">{query ? "No channel found" : "No voice channels"}</div>
+                                )}
+                                {displayList!.slice(0, 150).map(ch => (
+                                    <div key={ch.channelId}
+                                        className={`vcs-row${ch.canAccess ? "" : " vcs-row--locked"}`}
+                                        onClick={() => ch.canAccess && join(ch)}
+                                        title={ch.canAccess ? undefined : "No permission to join this channel"}
+                                    >
+                                        <span className="vcs-icon">
+                                            {ch.canAccess
+                                                ? (ch.channelType === 13 ? <StageIcon /> : <VoiceIcon />)
+                                                : <span style={{ opacity: 0.5, fontSize: 13 }}>🔒</span>
+                                            }
+                                        </span>
+                                        <div className="vcs-info">
+                                            <span className="vcs-name">{ch.channelName}</span>
+                                            <div className="vcs-guild">
+                                                {ch.guildIcon && <img src={ch.guildIcon} className="vcs-guild-icon" alt="" loading="lazy" />}
+                                                <span className="vcs-guild-name">{ch.guildName}</span>
+                                                {ch.memberCount > 0 && (
+                                                    <div className="vcs-members-info">
+                                                        <span className="vcs-members-count"> · {ch.memberCount}</span>
+                                                        <div className="vcs-member-avatars">
+                                                            {ch.memberIds?.map((uId: string) => {
+                                                                const user = UserStore.getUser(uId);
+                                                                if (!user) return null;
+                                                                const avatarUrl = user.getAvatarURL(ch.guildId, 16);
+                                                                return <img key={uId} src={avatarUrl} className="vcs-member-avatar" />;
+                                                            })}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
+                                        {joiningId === ch.channelId
+                                            ? <span className="vcs-joining-label">Joining...</span>
+                                            : ch.canAccess
+                                                ? <button className="vcs-join-btn" onClick={e => { e.stopPropagation(); join(ch); }}>Join</button>
+                                                : <span className="vcs-locked-label">Private</span>
+                                        }
                                     </div>
-                                    {joiningId === ch.channelId
-                                        ? <span className="vcs-joining-label">Joining...</span>
-                                        : ch.canAccess
-                                            ? <button className="vcs-join-btn" onClick={e => { e.stopPropagation(); join(ch); }}>Join</button>
-                                            : <span className="vcs-locked-label">Private</span>
-                                    }
-                                </div>
-                            ))}
-                            {displayList!.length > 80 && !query && (
-                                <div className="vcs-empty" style={{ fontSize: 11, opacity: 0.5 }}>
-                                    {displayList!.length - 80} more channels — use search
-                                </div>
-                            )}
+                                ))}
+                                {displayList!.length > 80 && !query && (
+                                    <div className="vcs-empty" style={{ fontSize: 11, opacity: 0.5 }}>
+                                        {displayList!.length - 80} more channels — use search
+                                    </div>
+                                )}
+                            </ScrollerThin>
                         </div>
                     </>
                 )}

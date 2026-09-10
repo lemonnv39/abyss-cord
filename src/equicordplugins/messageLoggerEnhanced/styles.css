@@ -1,3 +1,99 @@
+.vc-msg-logger-enhanced-root {
+    background: #313338;
+    overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.vc-msg-logger-enhanced-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.vc-msg-logger-enhanced-header-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(88, 101, 242, 0.2);
+    color: #5865f2;
+}
+
+.vc-msg-logger-enhanced-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.vc-msg-logger-enhanced-title {
+    margin: 0 !important;
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+.vc-msg-logger-enhanced-subtitle {
+    color: #b5bac1 !important;
+    margin-top: 2px;
+}
+
+/* ── Toolbar (tabs + filter) ────────────────────────────────────────────── */
+
+.vc-msg-logger-enhanced-toolbar {
+    padding: 4px 16px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.vc-msg-logger-enhanced-modal-tab-bar {
+    justify-content: flex-start;
+    gap: 20px;
+}
+
+.vc-msg-logger-enhanced-modal-tab-bar-item {
+    padding-bottom: 12px;
+    margin-bottom: -1px;
+    color: #949ba4;
+    font-weight: 600;
+}
+
+.vc-msg-logger-enhanced-modal-filter {
+    padding: 12px 0 14px;
+}
+
+.vc-msg-logger-enhanced-modal-filter input {
+    background: #1e1f22 !important;
+    border: 1px solid transparent !important;
+    color: #dbdee1 !important;
+}
+
+.vc-msg-logger-enhanced-modal-filter input:focus {
+    border-color: #5865f2 !important;
+}
+
+/* ── Content ────────────────────────────────────────────────────────────── */
+
+.vc-msg-logger-enhanced-content {
+    padding: 16px 20px !important;
+    overflow: hidden !important;
+}
+
+/* Discord's own thin/fade scroller component (used everywhere natively in
+   the client) instead of fighting the raw OS scrollbar with CSS overrides
+   that never reached the real overflow-y node. */
+.vc-msg-logger-enhanced-scroller {
+    height: 100%;
+}
+
+.vc-msg-logger-enhanced-card {
+    background: #2b2d31;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 12px 16px;
+    min-height: 200px;
+}
+
 .vc-msg-logger-enhanced-modal-root {
     max-height: 100%;
     max-width: 100%;
@@ -7,45 +103,29 @@
     display: grid;
     place-content: center;
     height: 100%;
+    min-height: 220px;
+    color: #dbdee1;
 }
 
 .vc-msg-logger-enhanced-modal-info-icon {
     position: absolute;
     top: -24px;
     right: -24px;
-    color: var(--interactive-icon-default);
+    color: #949ba4;
     cursor: pointer;
 }
 
 .vc-msg-logger-enhanced-modal-content-container {
-    /* max-height: 80vh; */
     overflow: hidden;
     height: 100%;
     width: 100%;
     transition: opacity 100ms ease-in;
 }
 
-.vc-msg-logger-enhanced-modal-content {
-    padding-bottom: 20px;
-    height: 100%;
-}
-
 .vc-msg-logger-enhanced-modal-content-inner {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
     height: 100%;
-}
-
-.vc-msg-logger-enhanced-modal-tab-bar-item {
-    padding-bottom: 16px;
-    margin-bottom: -2px;
-}
-
-.vc-msg-logger-enhanced-modal-tab-bar {
-    margin-bottom: 12px;
-    margin-left: -24px;
-    width: 114.5%;
-    justify-content: space-around;
 }
 
 .vc-msg-logger-enhanced-modal-from {
@@ -92,14 +172,64 @@
     padding: 1rem 2rem;
 }
 
-.vc-msg-logger-enhanced-modal {
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+/* ModalFooter's own DOM node keeps Discord's native background regardless of
+   className (our class lands on an inner wrapper, not the node that paints
+   it) — so instead of fighting that, an inner div with negative margins
+   bleeds over the whole footer and repaints it, clipped cleanly by
+   .vc-msg-logger-enhanced-root's overflow:hidden. */
+.vc-msg-logger-enhanced-footer-inner {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: 10px;
-    width: 100%;
-    padding-right: 20px;
+    background: #2b2d31;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin: -20px -16px;
+    padding: 20px 16px;
+    width: calc(100% + 32px);
+    max-width: unset;
+    box-sizing: border-box;
+    flex: 1 1 auto;
 }
 
-.vc-msg-logger-enhanced-modal-filter {
-    width: 106%;
+.vc-msg-logger-enhanced-btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.vc-msg-logger-enhanced-btn--secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: #dbdee1;
+}
+.vc-msg-logger-enhanced-btn--secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.vc-msg-logger-enhanced-btn--stop {
+    background: transparent;
+    border: 1px solid #ed4245;
+    color: #ed4245;
+}
+.vc-msg-logger-enhanced-btn--stop:hover:not(:disabled) {
+    background: rgba(237, 66, 69, 0.1);
+}
+.vc-msg-logger-enhanced-btn--stop:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.vc-msg-logger-enhanced-btn--danger {
+    background: #ed4245;
+    color: #ffffff;
+    margin-left: auto;
+}
+.vc-msg-logger-enhanced-btn--danger:hover {
+    background: #c9383b;
 }
