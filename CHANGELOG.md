@@ -10,6 +10,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Added
+- `VoiceTools` plugin: right-click a voice/stage channel for three red
+  moderation actions — mute all, deafen all, disconnect all — real
+  server-side actions (not a local mute), so each is labeled "(Permissions
+  required)". Always skips the user performing the action, even if they're
+  in the channel themselves.
 - `injector/` — full visual and functional redesign (v0.2.0): a black-hole
   video background, a splash screen with a rotating tagline, a borderless
   window with a custom macOS-style titlebar, and a fixed 3-row layout
