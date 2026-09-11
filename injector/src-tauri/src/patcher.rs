@@ -19,6 +19,7 @@
 use crate::asar::{self, StubOwner};
 use crate::dist_fetch;
 use crate::discord::{self, DiscordInstall, PatchOwner};
+use crate::presets;
 use serde::Serialize;
 use std::fs;
 use std::io;
@@ -41,7 +42,7 @@ fn emit_progress(app: &AppHandle, branch: &str, step: &str, status: &str, messag
     let _ = app.emit("install-progress", ProgressEvent { branch, step, status, message });
 }
 
-fn kill_running(branch: &str) {
+fn kill_running(branch: &str) -> bool {
     let exe = discord::exe_name_for_branch(branch);
 
     let mut sys = System::new();
@@ -61,6 +62,37 @@ fn kill_running(branch: &str) {
         // 500ms ne suffisent pas — observé en pratique juste après une
         // relance de Discord par l'injecteur lui-même).
         thread::sleep(Duration::from_millis(500));
+    }
+    killed_any
+}
+
+/// Tue TOUTES les branches connues (stable/canary/ptb) d'un coup, sans savoir
+/// laquelle est concernée, et retourne celles qui tournaient vraiment (pour
+/// pouvoir les relancer ensuite) — utilisé pour l'import/export de
+/// préréglages de plugins et le pack par défaut : `settings.json` est
+/// partagé entre toutes les branches (même dossier de données Abyss), donc
+/// peu importe laquelle tourne, elle peut réécrire le fichier juste après
+/// notre propre écriture si on ne la ferme pas d'abord (c'est très
+/// probablement le bug rapporté : l'import "ne marchait pas" parce qu'Abyss
+/// tournait encore et a resauvegardé son état en mémoire par-dessus).
+pub(crate) fn kill_all_known_processes() -> Vec<&'static str> {
+    ["stable", "canary", "ptb"].into_iter().filter(|b| kill_running(b)).collect()
+}
+
+/// Relance chacune des branches précédemment tuées, si on retrouve encore
+/// leur install sur le disque — best-effort, une branche qu'on ne relance pas
+/// se relance simplement à la main par l'utilisateur.
+pub(crate) fn relaunch_branches(branches: &[&str]) {
+    if branches.is_empty() {
+        return;
+    }
+    let dummy_patcher_path = PathBuf::from("__abyss_presets_relaunch_probe__");
+    for install in discord::find_discords(&dummy_patcher_path) {
+        if branches.contains(&install.branch.as_str()) {
+            if let Some(base) = &install.base_path {
+                let _ = relaunch(Path::new(base), &install.branch);
+            }
+        }
     }
 }
 
@@ -225,6 +257,13 @@ pub async fn patch_discord(
 
     let our_patcher_path = resolve_our_patcher_path(&app, repo_path.as_deref());
 
+    // Capturé AVANT de patcher : settings.json est écrit par Abyss lui-même à
+    // son tout premier lancement, donc "il n'existe pas encore" est le seul
+    // signal fiable pour reconnaître une machine qui n'a jamais eu Abyss —
+    // c'est là qu'on veut appliquer le pack de plugins par défaut, jamais sur
+    // une install existante dont on écraserait les choix déjà faits.
+    let is_fresh_install = !presets::settings_json_exists();
+
     kill_running(&branch);
 
     emit_progress(&app, &branch, "cleaning", "ok", None);
@@ -287,8 +326,42 @@ pub async fn patch_discord(
         return Ok(());
     }
 
+    if is_fresh_install {
+        apply_default_plugins_once_ready(&app, &branch);
+    }
+
     emit_progress(&app, &branch, "ready", "ok", None);
     Ok(())
+}
+
+/// Attend que settings.json apparaisse (créé par Abyss à son tout premier
+/// lancement, juste déclenché par relaunch() ci-dessus) puis lui applique le
+/// pack de plugins par défaut — best-effort : si Abyss met plus de 20s à
+/// démarrer ou que l'application échoue, on n'échoue pas toute l'install pour
+/// autant, l'utilisateur peut toujours importer un préréglage à la main.
+fn apply_default_plugins_once_ready(app: &AppHandle, branch: &str) {
+    emit_progress(app, branch, "finalizing", "ok", None);
+
+    let mut waited = Duration::ZERO;
+    let timeout = Duration::from_secs(20);
+    while !presets::settings_json_exists() && waited < timeout {
+        thread::sleep(Duration::from_millis(500));
+        waited += Duration::from_millis(500);
+    }
+
+    if !presets::settings_json_exists() {
+        return;
+    }
+
+    if let Err(e) = presets::apply_default_plugins() {
+        emit_progress(
+            app,
+            branch,
+            "ready",
+            "ok",
+            Some(format!("Pack de plugins par défaut non appliqué : {e}")),
+        );
+    }
 }
 
 #[tauri::command]

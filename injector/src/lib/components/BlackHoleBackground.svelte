@@ -1,13 +1,13 @@
 <script lang="ts">
-    // Vidéo fournie par l'utilisateur (voir src/assets/blackhole.mp4), importée
-    // via Vite pour obtenir l'URL finale packagée plutôt qu'un chemin absolu en dur.
-    import blackholeSrc from "../../assets/blackhole.mp4";
+    // Vidéo fournie par l'utilisateur (voir src/assets/splash-video.mp4),
+    // importée via Vite pour obtenir l'URL finale packagée plutôt qu'un
+    // chemin absolu en dur. Même fichier que le panneau incliné de l'accueil.
+    import blackholeSrc from "../../assets/splash-video.mp4";
 
     let {
         zoomedOut = false,
         darkened = false,
         blurred = false,
-        lightBlur = false,
         dimmed = false,
     }: {
         // Écran liste : moins zoomé que l'accueil, pour laisser plus de vidéo
@@ -22,10 +22,6 @@
         // de juste la voiler, pour que l'écran liste se sente comme un vrai
         // panneau au premier plan devant une scène qui recule.
         blurred?: boolean;
-        // Accueil : même idée que `blurred` mais plus légère — la vidéo doit
-        // rester bien plus nette qu'à l'écran liste, juste assez adoucie pour
-        // ne pas distraire du logo.
-        lightBlur?: boolean;
         // Assombri encore plus pendant qu'une installation tourne, pour
         // mettre le texte de progression en avant.
         dimmed?: boolean;
@@ -41,7 +37,6 @@
     <video
         class:zoomed-out={zoomedOut}
         class:blurred
-        class:light-blur={lightBlur}
         src={blackholeSrc}
         autoplay
         loop
@@ -89,10 +84,6 @@
 
     video.blurred {
         filter: blur(7px) brightness(0.8);
-    }
-
-    video.light-blur {
-        filter: blur(5px) brightness(0.9);
     }
 
     /* Voile pour garder le texte/les cards lisibles par-dessus, plus prononcé

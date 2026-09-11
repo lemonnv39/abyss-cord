@@ -48,6 +48,7 @@
         installing: { prefix: "Agent Abyss : ", highlight: "introduction d'Abyss...", color: "" },
         installed: { prefix: "Agent Abyss : ", highlight: "installation réussie...", color: "var(--ok)" },
         restarting: { prefix: "Agent Abyss : ", highlight: "redémarrage de Discord...", color: "" },
+        finalizing: { prefix: "Agent Abyss : ", highlight: "configuration des plugins de base...", color: "" },
         ready: { prefix: "Agent Abyss : ", highlight: "Discord prêt à l'emploi...", color: "var(--ok)" },
     };
 

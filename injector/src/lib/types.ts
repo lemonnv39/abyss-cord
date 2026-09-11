@@ -32,7 +32,7 @@ export interface FixResult {
 /// Miroir de l'événement Tauri "install-progress" (voir patcher.rs).
 export interface InstallProgressEvent {
     branch: string;
-    step: "cleaning" | "checking" | "checked" | "installing" | "installed" | "restarting" | "ready";
+    step: "cleaning" | "checking" | "checked" | "installing" | "installed" | "restarting" | "finalizing" | "ready";
     status: "ok" | "error";
     message?: string | null;
 }

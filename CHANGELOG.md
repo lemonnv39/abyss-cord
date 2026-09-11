@@ -137,6 +137,17 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   instead of telling the user why.
 - `TokenImporter`'s modal and `MultiInstance`'s native/icon handling
   redesigned/hardened.
+- `injector/` (v0.2.1) — plugin-preset import silently did nothing if Abyss
+  was still running: the still-open process resaved its own in-memory state
+  over `settings.json` right after the import wrote to it. Import now closes
+  every known Discord/Abyss branch before writing and relaunches them after.
+  Brand-new installs (no `settings.json` yet on the machine) now also get a
+  ready-to-use default plugin pack applied automatically right after their
+  first launch, instead of needing a manual export/import round-trip.
+  Splash screen's black-hole video background is now unified with the rest
+  of the app (was framed/panelled only on the list and settings screens);
+  the settings gear icon is hidden on the splash screen and aligned with the
+  "Abyss" wordmark on the list screen.
 
 ### Removed
 - `SkinwalkerProfile` plugin, at the user's request.

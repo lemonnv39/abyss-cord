@@ -178,17 +178,16 @@
 
 <div class="shell">
     <BlackHoleBackground
-        zoomedOut={screen !== "splash"}
-        darkened={screen !== "splash"}
-        blurred={screen !== "splash"}
-        lightBlur={screen === "splash"}
+        zoomedOut
+        darkened
+        blurred
         dimmed={anyInstalling}
     />
     <TitleBar
         onBack={screen !== "splash" ? () => (screen = screen === "settings" ? screenBeforeSettings : "splash") : undefined}
-        onSettings={screen !== "settings"
+        onSettings={screen === "list"
             ? () => {
-                  screenBeforeSettings = screen === "list" ? "list" : "splash";
+                  screenBeforeSettings = "list";
                   screen = "settings";
               }
             : undefined}

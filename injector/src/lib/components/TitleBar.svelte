@@ -108,6 +108,9 @@
     }
 
     .gear {
+        /* Pousse l'icône vers le bas pour s'aligner avec le texte "Abyss" de
+           l'écran liste plutôt que de rester collée aux points de contrôle. */
+        margin-top: 20px;
         background: rgba(255, 255, 255, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.12);
         color: rgba(255, 255, 255, 0.75);

@@ -14,6 +14,9 @@
     ];
 </script>
 
+<!-- Le fond vidéo (BlackHoleBackground) est rendu par App.svelte, en commun
+     avec l'écran liste — plus de panneau/cadre séparé ici, même logique
+     partout dans l'appli. -->
 <div class="splash">
     <div class="center">
         <span class="eyebrow">Abyss Injector</span>
@@ -59,24 +62,7 @@
         align-items: center;
         gap: 10px;
         text-align: center;
-        padding: 56px 64px;
         animation: rise var(--duration-slow) var(--ease-out) both;
-    }
-
-    /* Zone d'ombre abstraite derrière le contenu — pas de cadre/carte, deux
-       flaques sombres asymétriques et floutées pour détacher le texte de la
-       vidéo sans jamais dessiner de bordure visible. */
-    .center::before {
-        content: "";
-        position: absolute;
-        inset: -70px -60px;
-        z-index: -1;
-        background:
-            radial-gradient(ellipse 48% 78% at 38% 42%, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0) 72%),
-            radial-gradient(ellipse 42% 70% at 64% 58%, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0) 75%),
-            radial-gradient(ellipse 60% 92% at 50% 50%, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 82%);
-        filter: blur(8px);
-        pointer-events: none;
     }
 
     @keyframes rise {
