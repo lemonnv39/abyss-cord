@@ -25,7 +25,7 @@
  * Electron sendInputEvent ne suffit pas pour ça.
  */
 
-import { BrowserWindow, screen } from "electron";
+import { BrowserWindow, globalShortcut, screen } from "electron";
 import { spawn } from "child_process";
 import { mkdtempSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -42,6 +42,39 @@ const DICTIONARY: string[] = [
 ];
 
 let panelWindow: BrowserWindow | null = null;
+
+// Fenêtre Discord à cibler pour la frappe — capturée au moment où le bouton
+// header bar déclenche openWindow() (event.sender EST alors forcément la
+// fenêtre Discord principale, puisque le panel n'existe pas encore). Avant
+// ce fix, on devinait la cible avec "la première fenêtre qui n'est pas le
+// panel" à chaque frappe, ce qui pouvait viser une mauvaise fenêtre (popout
+// d'appel, visionneuse d'image...) et faire "disparaître" la frappe sans
+// erreur visible — c'était la cause la plus probable des mots qui ne
+// s'écrivaient pas.
+let gameWindow: BrowserWindow | null = null;
+
+// Raccourci global : ramène le panel au premier plan et remet le focus sur
+// le champ syllabe sans avoir à cliquer dedans (utile en plein WordBomb où
+// on n'a pas le temps de viser la fenêtre à la souris). Enregistré seulement
+// pendant que le panel est ouvert — pas question de squatter une combinaison
+// clavier globale en permanence pour une fonctionnalité annexe.
+const FOCUS_HOTKEY = "Control+Alt+F";
+
+function registerHotkey() {
+    try {
+        globalShortcut.register(FOCUS_HOTKEY, () => {
+            if (panelWindow && !panelWindow.isDestroyed()) {
+                panelWindow.show();
+                panelWindow.focus();
+                panelWindow.webContents.send("focus-syllable");
+            }
+        });
+    } catch { /* raccourci déjà pris par une autre appli — pas bloquant */ }
+}
+
+function unregisterHotkey() {
+    try { globalShortcut.unregister(FOCUS_HOTKEY); } catch { /* best effort */ }
+}
 
 function runPowershellScript(psScript: string): Promise<void> {
     if (process.platform !== "win32") return Promise.resolve();
@@ -98,10 +131,15 @@ export async function typeWord(
         const safeLps = Math.max(1, Math.min(100, lps));
         const safeHumanChance = Math.max(0, Math.min(100, humanChance));
 
-        // Retarget hors de notre propre fenêtre panel (voir en-tête du fichier).
-        let targetWindow = BrowserWindow.fromWebContents(event.sender);
-        if (panelWindow && targetWindow === panelWindow) {
-            targetWindow = BrowserWindow.getAllWindows().find(w => w !== panelWindow && !w.isDestroyed()) ?? null;
+        // Cible en priorité la fenêtre Discord capturée à l'ouverture du panel
+        // (voir gameWindow) — ne retombe sur la devinette "première fenêtre qui
+        // n'est pas le panel" que si elle est indisponible.
+        let targetWindow = gameWindow && !gameWindow.isDestroyed() ? gameWindow : null;
+        if (!targetWindow) {
+            targetWindow = BrowserWindow.fromWebContents(event.sender);
+            if (panelWindow && targetWindow === panelWindow) {
+                targetWindow = BrowserWindow.getAllWindows().find(w => w !== panelWindow && !w.isDestroyed()) ?? null;
+            }
         }
 
         let hwnd = 0;
@@ -125,11 +163,29 @@ export async function typeWord(
             "try {",
             "  Add-Type -AssemblyName System.Windows.Forms",
             "  Add-Type -AssemblyName System.Drawing",
-            "  $sig = '[DllImport(\"user32.dll\")] public static extern void mouse_event(uint a, uint b, uint c, uint d, uint e); [DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport(\"user32.dll\")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);'",
+            "  $sig = '[DllImport(\"user32.dll\")] public static extern void mouse_event(uint a, uint b, uint c, uint d, uint e); [DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport(\"user32.dll\")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo); [DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow(); [DllImport(\"user32.dll\")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId); [DllImport(\"user32.dll\")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach); [DllImport(\"kernel32.dll\")] public static extern uint GetCurrentThreadId();'",
             "  Add-Type -MemberDefinition $sig -Name WinAPI -Namespace Abyss -ErrorAction SilentlyContinue",
             `  $handle = [IntPtr]${hwnd}`,
             "  if ($handle -ne [IntPtr]::Zero) {",
+            // Windows refuse silencieusement SetForegroundWindow() si notre
+            // process (powershell.exe, lancé sans input utilisateur récent)
+            // n'est pas celui qui a la main — c'est la cause la plus probable
+            // des frappes qui "partaient dans le vide" de façon aléatoire.
+            // On attache temporairement notre file d'input à celle du thread
+            // actuellement au premier plan (technique standard Win32) pour que
+            // le changement de focus soit accepté à coup sûr, puis on détache.
+            "    $fgWindow = [Abyss.WinAPI]::GetForegroundWindow()",
+            "    $curThreadId = [Abyss.WinAPI]::GetCurrentThreadId()",
+            "    $dummyPid = 0",
+            "    $fgThreadId = [Abyss.WinAPI]::GetWindowThreadProcessId($fgWindow, [ref]$dummyPid)",
+            "    $attached = $false",
+            "    if ($fgThreadId -ne 0 -and $fgThreadId -ne $curThreadId) {",
+            "      $attached = [Abyss.WinAPI]::AttachThreadInput($curThreadId, $fgThreadId, $true)",
+            "    }",
             "    [Abyss.WinAPI]::SetForegroundWindow($handle) | Out-Null",
+            "    if ($attached) {",
+            "      [Abyss.WinAPI]::AttachThreadInput($curThreadId, $fgThreadId, $false) | Out-Null",
+            "    }",
             "    Start-Sleep -Milliseconds 10",
             "  }",
             `  [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(${centerX}, ${centerY})`,
@@ -178,28 +234,41 @@ function preloadPath(): string {
             'contextBridge.exposeInMainWorld("wbhAPI", {',
             '  typeWord: (word, lps, humanChance) => ipcRenderer.invoke("VencordPluginNative_WordBombHelper_typeWord", word, lps, humanChance),',
             '  closeWindow: () => ipcRenderer.invoke("VencordPluginNative_WordBombHelper_closeWindow"),',
+            '  onFocusSyllable: (cb) => ipcRenderer.on("focus-syllable", () => cb()),',
             "});",
         ].join("\n"), "utf-8");
     } catch { /* best effort */ }
     return file;
 }
 
-export async function openWindow(_: any): Promise<{ status: "opened" | "closed"; }> {
+export async function openWindow(event: Electron.IpcMainInvokeEvent): Promise<{ status: "opened" | "closed"; }> {
     if (panelWindow && !panelWindow.isDestroyed()) {
         panelWindow.close();
         panelWindow = null;
+        unregisterHotkey();
         return { status: "closed" };
     }
 
+    // event.sender est forcément la fenêtre Discord principale ici (le panel
+    // n'existe pas encore) — voir le commentaire sur gameWindow plus haut.
+    const opener = BrowserWindow.fromWebContents(event.sender);
+    if (opener) {
+        gameWindow = opener;
+        opener.once("closed", () => {
+            if (gameWindow === opener) gameWindow = null;
+        });
+    }
+
     panelWindow = new BrowserWindow({
-        // Hauteur fixe suffisante pour la vue accueil ET réglages sans
+        // Hauteur fixe suffisante pour la vue accueil (grille de lettres +
+        // historique) ET réglages (mots personnels + rappel du raccourci) sans
         // dépendre d'un resize dynamique via IPC — Nightcord utilise
         // window.worldBombAPI.resize(...) sur chaque bascule de vue, mais on
         // a déjà eu ce bug une fois ici : un round-trip IPC silencieusement
-        // raté laisse la vue réglages rendue-mais-coupée dans une fenêtre
-        // encore dimensionnée pour l'accueil. Hauteur fixe = pas de round-trip.
+        // raté laisse une vue rendue-mais-coupée dans une fenêtre encore
+        // dimensionnée pour l'autre. Hauteur fixe = pas de round-trip.
         width: 326,
-        height: 440,
+        height: 640,
         transparent: true,
         frame: false,
         alwaysOnTop: true,
@@ -218,7 +287,10 @@ export async function openWindow(_: any): Promise<{ status: "opened" | "closed";
 
     panelWindow.on("closed", () => {
         panelWindow = null;
+        unregisterHotkey();
     });
+
+    registerHotkey();
 
     return { status: "opened" };
 }
@@ -228,4 +300,5 @@ export function closeWindow(_: any) {
         panelWindow.close();
     }
     panelWindow = null;
+    unregisterHotkey();
 }

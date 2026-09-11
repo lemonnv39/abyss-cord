@@ -50,7 +50,7 @@ function WordBombHelperButton() {
 export default definePlugin({
     name: "WordBombHelper",
     enabledByDefault: false,
-    description: "WordBomb assistant in its own draggable window, ported from Nightcord: tracks which letters you haven't used, auto-picks the best word for the letters you're given, and types it for real at a speed and human-like typo rate you control (settings persist between sessions). Click into WordBomb's own text field first — the sequence also clicks the window's center itself to help focus land right, but it doesn't reach into the game itself.",
+    description: "WordBomb assistant in its own draggable window: a live A-Z grid tracks which letters you still need, understands prefix/suffix syllables (\"th-\", \"-er\") as well as plain substrings, auto-picks the best word (theme-aware, with your own custom words mixed in) and types it for real at a speed and human-like typo rate you control. Keeps a short history of what it typed, and a global Ctrl+Alt+F hotkey brings the window back and refocuses the input without touching the mouse. Settings persist between sessions.",
     authors: [{ name: "0ctane", id: 0n }],
 
     headerBarButton: {
