@@ -29,6 +29,11 @@ export async function installUpdate(
         }
     });
 
-    // L'installeur Windows (NSIS) a besoin que l'app relance après install.
+    // Sous Windows, downloadAndInstall() ne "resolve" jamais vraiment : côté
+    // Rust, l'installeur NSIS est lancé puis le process appelle lui-même
+    // std::process::exit(0) avant qu'une réponse IPC ne puisse revenir ici —
+    // ce relaunch() n'est donc atteint que sur macOS/Linux, où Tauri NE relance
+    // PAS automatiquement l'app après install (contrairement à Windows/NSIS,
+    // qui le fait lui-même via son flag /R une fois l'installation terminée).
     await relaunch();
 }

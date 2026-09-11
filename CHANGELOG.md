@@ -148,6 +148,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   of the app (was framed/panelled only on the list and settings screens);
   the settings gear icon is hidden on the splash screen and aligned with the
   "Abyss" wordmark on the list screen.
+- `injector/` (v0.2.2) — self-update showed a full NSIS installer wizard
+  instead of updating silently in the background: the updater plugin's
+  Windows install mode wasn't set, so it fell back to Tauri's "passive"
+  default instead of fully silent. Now explicitly `quiet` (`/S`), no window
+  pops up at all.
 
 ### Removed
 - `SkinwalkerProfile` plugin, at the user's request.
