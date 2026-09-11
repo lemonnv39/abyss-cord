@@ -153,6 +153,13 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   Windows install mode wasn't set, so it fell back to Tauri's "passive"
   default instead of fully silent. Now explicitly `quiet` (`/S`), no window
   pops up at all.
+- `injector/` (v0.2.3) — re-injecting an already-patched install (updating
+  Discord Canary in testing) could fail with "Accès refusé (os error 5)":
+  Windows can hold the file handle on `app.asar` a bit longer than expected
+  right after killing the process (antivirus scanning the exe that just
+  exited is a common cause), and the existing retry budget (~1.5s) wasn't
+  always enough. Bumped to a much more generous ~6s of retries before
+  actually giving up.
 
 ### Removed
 - `SkinwalkerProfile` plugin, at the user's request.

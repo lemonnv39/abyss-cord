@@ -59,9 +59,9 @@ fn kill_running(branch: &str) -> bool {
     if killed_any {
         // Laisse Windows relâcher les handles sur app.asar avant de le renommer
         // (voir aussi rename_with_retry ci-dessous, qui rattrape le cas où
-        // 500ms ne suffisent pas — observé en pratique juste après une
+        // 700ms ne suffisent pas — observé en pratique juste après une
         // relance de Discord par l'injecteur lui-même).
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(700));
     }
     killed_any
 }
@@ -96,21 +96,26 @@ pub(crate) fn relaunch_branches(branches: &[&str]) {
     }
 }
 
-/// `fs::rename` avec quelques tentatives : juste après avoir tué Discord (ou
+/// `fs::rename` avec plusieurs tentatives : juste après avoir tué Discord (ou
 /// juste après l'avoir relancé nous-mêmes puis re-tué pour un second patch
-/// rapproché), Windows peut garder le fichier verrouillé une fraction de
-/// seconde de plus que le délai fixe de kill_running — l'antivirus qui scanne
-/// le process qui vient de sortir en est une cause fréquente. Sans retry,
-/// ça remonte un "os error 5" (accès refusé) déroutant côté utilisateur.
+/// rapproché — le cas d'une réinjection sur une install déjà patchée fait
+/// jusqu'à 3 renames à la suite, via unpatch_dir puis patch_dir), Windows peut
+/// garder le fichier verrouillé plus longtemps que le délai fixe de
+/// kill_running — l'antivirus qui scanne le process qui vient de sortir en
+/// est une cause fréquente, et observée en vrai sur Discord Canary (échec
+/// "Accès refusé (os error 5)" malgré le premier délai). Budget total
+/// généreux (~6s) plutôt qu'un échec direct — un patch prend de toute façon
+/// déjà plusieurs secondes, quelques secondes de retry silencieux valent
+/// largement mieux qu'un message d'erreur déroutant pour l'utilisateur.
 fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
     let mut last_err = None;
-    for attempt in 0..6 {
+    for attempt in 0..16 {
         match fs::rename(from, to) {
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_err = Some(e);
-                if attempt < 5 {
-                    thread::sleep(Duration::from_millis(300));
+                if attempt < 15 {
+                    thread::sleep(Duration::from_millis(400));
                 }
             }
         }
