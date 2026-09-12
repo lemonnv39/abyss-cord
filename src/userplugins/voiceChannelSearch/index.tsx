@@ -54,26 +54,42 @@ async function scan(): Promise<ScanResult> {
     return new Promise(resolve => {
         setTimeout(() => {
             try {
+                const guilds: any = GuildStore.getGuilds?.() ?? {};
+
                 const memberCount: Record<string, number> = {};
                 const memberIds: Record<string, string[]> = {};
-                const allMemberIds: Record<string, string[]> = {};
+                // Construite DIRECTEMENT depuis getAllVoiceStates() + ChannelStore,
+                // sans dépendre de la liste `out` construite plus bas via
+                // GuildChannelStore.getChannels() — sur une grosse guilde, ce
+                // dernier peut ne pas exposer tous les salons vocaux (catégories
+                // pas encore chargées côté client), ce qui ferait disparaître
+                // silencieusement des gens pourtant bien présents dans les
+                // voice states. "Chercher un utilisateur" doit rester fiable
+                // même quand la liste de navigation ne l'est pas complètement.
+                const voiceMembers: VoiceMember[] = [];
                 try {
                     const all: any = VoiceStateStore.getAllVoiceStates?.() ?? {};
                     for (const gId in all) {
+                        const gName: string = guilds[gId]?.name ?? "";
                         for (const uId in all[gId]) {
                             const cid = all[gId][uId]?.channelId;
-                            if (cid) {
-                                memberCount[cid] = (memberCount[cid] ?? 0) + 1;
-                                if (!memberIds[cid]) memberIds[cid] = [];
-                                if (memberIds[cid].length < 5) memberIds[cid].push(uId);
-                                if (!allMemberIds[cid]) allMemberIds[cid] = [];
-                                allMemberIds[cid].push(uId);
-                            }
+                            if (!cid) continue;
+                            memberCount[cid] = (memberCount[cid] ?? 0) + 1;
+                            if (!memberIds[cid]) memberIds[cid] = [];
+                            if (memberIds[cid].length < 5) memberIds[cid].push(uId);
+
+                            const channel: any = ChannelStore.getChannel?.(cid);
+                            voiceMembers.push({
+                                userId: uId,
+                                channelId: cid,
+                                channelName: channel?.name ?? "",
+                                guildId: gId,
+                                guildName: gName,
+                            });
                         }
                     }
                 } catch { }
 
-                const guilds: any = GuildStore.getGuilds?.() ?? {};
                 const out: VoiceChannel[] = [];
 
                 for (const guildId in guilds) {
@@ -112,23 +128,6 @@ async function scan(): Promise<ScanResult> {
                 }
 
                 out.sort((a, b) => b.memberCount - a.memberCount || a.guildName.localeCompare(b.guildName));
-
-                // getAllVoiceStates() ne couvre QUE les guildes où le client
-                // local est lui-même présent — un hit ici est donc forcément
-                // dans une guilde qu'on a en commun avec la personne trouvée,
-                // sans calcul supplémentaire à faire.
-                const voiceMembers: VoiceMember[] = [];
-                for (const ch of out) {
-                    for (const uId of allMemberIds[ch.channelId] ?? []) {
-                        voiceMembers.push({
-                            userId: uId,
-                            channelId: ch.channelId,
-                            channelName: ch.channelName,
-                            guildId: ch.guildId,
-                            guildName: ch.guildName,
-                        });
-                    }
-                }
 
                 const result: ScanResult = { channels: out, voiceMembers };
                 scanCache = result;
@@ -193,6 +192,7 @@ function VoiceSearchModal({ rootProps, channels, voiceMembers }: { rootProps: an
     // personnes ont un pseudo proche, ou pour viser quelqu'un sans ambiguïté).
     const matchedUsers = useMemo(() => {
         if (!debouncedUserQuery) return [];
+        const seen = new Set<string>();
         const results: Array<VoiceMember & { displayName: string; avatarUrl: string; }> = [];
         for (const m of voiceMembers) {
             const user = UserStore.getUser(m.userId);
@@ -201,8 +201,36 @@ function VoiceSearchModal({ rootProps, channels, voiceMembers }: { rootProps: an
             const nameMatches = displayName?.toLowerCase().includes(debouncedUserQuery) || user.username?.toLowerCase().includes(debouncedUserQuery);
             const idMatches = m.userId.includes(debouncedUserQuery);
             if (!nameMatches && !idMatches) continue;
+            seen.add(m.userId);
             results.push({ ...m, displayName, avatarUrl: user.getAvatarURL(m.guildId, 32) });
         }
+
+        // Filet de sécurité pour un ID complet : passe directement par
+        // VoiceStateStore.getVoiceStateForUser() plutôt que par le scan
+        // périodique ci-dessus — ce dernier a un TTL de 10s et dépend d'une
+        // itération manuelle des guildes/salons, donc un ID collé juste après
+        // qu'un ami ait rejoint un vocal pourrait rater le scan en cache.
+        if (/^\d{15,25}$/.test(debouncedUserQuery) && !seen.has(debouncedUserQuery)) {
+            const vs: any = VoiceStateStore.getVoiceStateForUser?.(debouncedUserQuery);
+            if (vs?.channelId) {
+                const user = UserStore.getUser(debouncedUserQuery);
+                const channel: any = ChannelStore.getChannel?.(vs.channelId);
+                const guildId: string = vs.guildId ?? channel?.guild_id ?? "";
+                const guild: any = GuildStore.getGuild?.(guildId);
+                if (user) {
+                    results.push({
+                        userId: debouncedUserQuery,
+                        channelId: vs.channelId,
+                        channelName: channel?.name ?? "",
+                        guildId,
+                        guildName: guild?.name ?? "",
+                        displayName: user.globalName || user.username,
+                        avatarUrl: user.getAvatarURL(guildId, 32),
+                    });
+                }
+            }
+        }
+
         return results;
     }, [voiceMembers, debouncedUserQuery]);
 
