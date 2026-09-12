@@ -172,6 +172,14 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   stuck permanently on "mettre à jour" with no new plugins ever landing. It
   now re-patches every currently Abyss-owned install with the fresh build in
   the same click.
+- `injector/` (v0.2.5) — first-time injections could still hit "Accès refusé
+  (os error 5)" even after the v0.2.3 retry fix: a brand new, never-seen
+  executable is exactly the case where antivirus/SmartScreen cloud checks
+  take the longest to release a file lock, well past the previous ~6s
+  budget. Retry window extended to ~20s, and the error message (when it
+  still happens) now says what to actually check — antivirus quarantine,
+  Discord not fully closed, or admin rights if Discord is installed for all
+  users — instead of the raw, meaningless OS error text.
 
 ### Removed
 - `SkinwalkerProfile` plugin, at the user's request.

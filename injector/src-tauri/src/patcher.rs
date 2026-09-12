@@ -109,18 +109,36 @@ pub(crate) fn relaunch_branches(branches: &[&str]) {
 /// largement mieux qu'un message d'erreur déroutant pour l'utilisateur.
 fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
     let mut last_err = None;
-    for attempt in 0..16 {
+    for attempt in 0..40 {
         match fs::rename(from, to) {
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_err = Some(e);
-                if attempt < 15 {
-                    thread::sleep(Duration::from_millis(400));
+                if attempt < 39 {
+                    thread::sleep(Duration::from_millis(500));
                 }
             }
         }
     }
-    Err(last_err.unwrap())
+
+    let err = last_err.unwrap();
+    // Une "Accès refusé" qui survit ~20s de retry n'est plus le petit verrou
+    // transitoire habituel (antivirus qui scanne l'exe qui vient de sortir) —
+    // observé en vrai sur une toute première injection (le pire cas : un
+    // exécutable totalement inconnu de Windows/l'antivirus déclenche souvent
+    // une vérification cloud plus longue qu'un simple scan local). Le message
+    // brut de Windows ("Accès refusé (os error 5)") ne donne aucune piste
+    // concrète — remplacé par un message qui dit quoi vérifier.
+    if err.raw_os_error() == Some(5) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "Accès refusé après plusieurs tentatives — le fichier reste bloqué. \
+            Vérifie que Discord est complètement fermé (pas juste dans la barre des tâches), \
+            que ton antivirus ne bloque pas l'injecteur (regarde sa quarantaine), \
+            et si Discord est installé pour tous les utilisateurs de ce PC, relance l'injecteur en tant qu'administrateur.",
+        ));
+    }
+    Err(err)
 }
 
 fn unpatch_dir(resources: &Path) -> io::Result<()> {
