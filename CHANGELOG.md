@@ -137,7 +137,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 - The "Show Abyss" plugin-list filter was mislabeled onto
   `SearchStatus.EQUICORD` (a leftover from the Equicord→Abyss rename)
   instead of `SearchStatus.USER_PLUGINS`, so it showed Equicord's stock
-  plugins instead of ours.
+  plugins instead of ours. Turned out the option wasn't showing up in the
+  dropdown at all afterwards: its visibility also required `!IS_STANDALONE`,
+  a flag that's `true` for every build actually distributed through the
+  injector (the only way anyone but a from-source dev ever runs Abyss) —
+  hiding it for 100% of real users. Dropped that condition entirely.
 - Video/GIF playback stutter (~2fps) caused by `maxPerformance`'s
   `disable-gpu-vsync` flag decoupling frame presentation from the display's
   refresh rate — isolated into the new opt-in `uncapFrameRate` setting
