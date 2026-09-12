@@ -188,7 +188,9 @@ function VoiceSearchModal({ rootProps, channels, voiceMembers }: { rootProps: an
     // Ne cherche que parmi les gens ACTUELLEMENT en vocal (voiceMembers) —
     // pas dans tout le cache d'utilisateurs connus du client, qui donnerait
     // des dizaines de résultats sans rapport avec la question posée ("est-ce
-    // que cette personne est en vocal là, maintenant").
+    // que cette personne est en vocal là, maintenant"). Accepte aussi bien un
+    // pseudo/nom d'affichage qu'un ID Discord brut (pratique quand deux
+    // personnes ont un pseudo proche, ou pour viser quelqu'un sans ambiguïté).
     const matchedUsers = useMemo(() => {
         if (!debouncedUserQuery) return [];
         const results: Array<VoiceMember & { displayName: string; avatarUrl: string; }> = [];
@@ -196,7 +198,9 @@ function VoiceSearchModal({ rootProps, channels, voiceMembers }: { rootProps: an
             const user = UserStore.getUser(m.userId);
             if (!user) continue;
             const displayName = user.globalName || user.username;
-            if (!displayName?.toLowerCase().includes(debouncedUserQuery) && !user.username?.toLowerCase().includes(debouncedUserQuery)) continue;
+            const nameMatches = displayName?.toLowerCase().includes(debouncedUserQuery) || user.username?.toLowerCase().includes(debouncedUserQuery);
+            const idMatches = m.userId.includes(debouncedUserQuery);
+            if (!nameMatches && !idMatches) continue;
             results.push({ ...m, displayName, avatarUrl: user.getAvatarURL(m.guildId, 32) });
         }
         return results;
@@ -269,7 +273,7 @@ function VoiceSearchModal({ rootProps, channels, voiceMembers }: { rootProps: an
                             </svg>
                             <input
                                 className="vcs-search-input"
-                                placeholder="Search a user..."
+                                placeholder="Search a user (name or ID)..."
                                 value={userQuery}
                                 onChange={handleUserQueryChange}
                             />
