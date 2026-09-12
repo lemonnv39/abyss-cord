@@ -180,6 +180,16 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   still happens) now says what to actually check — antivirus quarantine,
   Discord not fully closed, or admin rights if Discord is installed for all
   users — instead of the raw, meaningless OS error text.
+- `injector/` (v0.2.6) — the same "Accès refusé" persisted for a friend's
+  first-ever injection even after 20s of retries, with no third-party
+  antivirus and "accès contrôlé aux dossiers" confirmed off — ruling out
+  every previous theory. The remaining suspect: renaming a large file and
+  immediately replacing it under the same name is exactly the shape Windows
+  Defender's general (always-on) ransomware behavior heuristics are built
+  to catch, independent of that specific setting. Backup/restore now uses a
+  plain file copy (only needs read access to the source, never an exclusive
+  lock) and the new stub is written directly in place over `app.asar`
+  instead of swapping files by name.
 
 ### Removed
 - `SkinwalkerProfile` plugin, at the user's request.

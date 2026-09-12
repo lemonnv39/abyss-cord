@@ -57,10 +57,10 @@ fn kill_running(branch: &str) -> bool {
     }
 
     if killed_any {
-        // Laisse Windows relâcher les handles sur app.asar avant de le renommer
-        // (voir aussi rename_with_retry ci-dessous, qui rattrape le cas où
-        // 700ms ne suffisent pas — observé en pratique juste après une
-        // relance de Discord par l'injecteur lui-même).
+        // Laisse Windows relâcher les handles sur app.asar avant d'y toucher
+        // (voir aussi retry_io ci-dessous, qui rattrape le cas où 700ms ne
+        // suffisent pas — observé en pratique juste après une relance de
+        // Discord par l'injecteur lui-même).
         thread::sleep(Duration::from_millis(700));
     }
     killed_any
@@ -96,21 +96,17 @@ pub(crate) fn relaunch_branches(branches: &[&str]) {
     }
 }
 
-/// `fs::rename` avec plusieurs tentatives : juste après avoir tué Discord (ou
-/// juste après l'avoir relancé nous-mêmes puis re-tué pour un second patch
-/// rapproché — le cas d'une réinjection sur une install déjà patchée fait
-/// jusqu'à 3 renames à la suite, via unpatch_dir puis patch_dir), Windows peut
-/// garder le fichier verrouillé plus longtemps que le délai fixe de
-/// kill_running — l'antivirus qui scanne le process qui vient de sortir en
-/// est une cause fréquente, et observée en vrai sur Discord Canary (échec
-/// "Accès refusé (os error 5)" malgré le premier délai). Budget total
-/// généreux (~6s) plutôt qu'un échec direct — un patch prend de toute façon
-/// déjà plusieurs secondes, quelques secondes de retry silencieux valent
-/// largement mieux qu'un message d'erreur déroutant pour l'utilisateur.
-fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
+/// Réessaie une opération fichier plusieurs fois avant d'abandonner — juste
+/// après avoir tué Discord (ou l'avoir relancé nous-mêmes puis re-tué pour un
+/// patch rapproché), Windows peut garder un fichier verrouillé plus
+/// longtemps que le délai fixe de kill_running. Budget généreux (~20s) plutôt
+/// qu'un échec direct : un patch prend de toute façon déjà plusieurs
+/// secondes, quelques secondes de retry silencieux valent largement mieux
+/// qu'un message d'erreur déroutant pour l'utilisateur.
+fn retry_io<F: FnMut() -> io::Result<()>>(mut op: F) -> io::Result<()> {
     let mut last_err = None;
     for attempt in 0..40 {
-        match fs::rename(from, to) {
+        match op() {
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_err = Some(e);
@@ -124,26 +120,48 @@ fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
     let err = last_err.unwrap();
     // Une "Accès refusé" qui survit ~20s de retry n'est plus le petit verrou
     // transitoire habituel (antivirus qui scanne l'exe qui vient de sortir) —
-    // observé en vrai sur une toute première injection (le pire cas : un
-    // exécutable totalement inconnu de Windows/l'antivirus déclenche souvent
-    // une vérification cloud plus longue qu'un simple scan local). Le message
-    // brut de Windows ("Accès refusé (os error 5)") ne donne aucune piste
-    // concrète — remplacé par un message qui dit quoi vérifier.
+    // observé en vrai sur une toute première injection avec seulement
+    // Windows Defender (pas d'antivirus tiers, pas d'accès contrôlé aux
+    // dossiers, install standard par utilisateur) : le suspect le plus
+    // probable devient alors le comportement anti-ransomware général de
+    // Defender, qui peut bloquer un renommage suivi d'un remplacement d'un
+    // gros fichier — un pattern qui ressemble justement à du chiffrement de
+    // ransomware. Le message brut de Windows ("Accès refusé (os error 5)")
+    // ne donne aucune piste concrète — remplacé par un message qui dit quoi
+    // vérifier.
     if err.raw_os_error() == Some(5) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "Accès refusé après plusieurs tentatives — le fichier reste bloqué. \
             Vérifie que Discord est complètement fermé (pas juste dans la barre des tâches), \
-            que ton antivirus ne bloque pas l'injecteur (regarde sa quarantaine), \
-            et si Discord est installé pour tous les utilisateurs de ce PC, relance l'injecteur en tant qu'administrateur.",
+            que ton antivirus ne bloque pas l'injecteur (regarde sa quarantaine — y compris Windows \
+            Defender, Historique de protection), et si Discord est installé pour tous les \
+            utilisateurs de ce PC, relance l'injecteur en tant qu'administrateur.",
         ));
     }
     Err(err)
 }
 
+fn copy_with_retry(from: &Path, to: &Path) -> io::Result<()> {
+    retry_io(|| fs::copy(from, to).map(|_| ()))
+}
+
+fn write_stub_with_retry(out_file: &Path, patcher_path: &str, build_sha: Option<&str>) -> io::Result<()> {
+    retry_io(|| asar::write_app_asar(out_file, patcher_path, build_sha))
+}
+
+/// Sauvegarde/restauration par COPIE plutôt que par renommage : un renommage
+/// exige un accès EXCLUSIF au fichier (Windows refuse de renommer un fichier
+/// tant qu'un seul handle reste ouvert dessus, même en lecture seule), alors
+/// qu'une copie ne nécessite qu'un accès en lecture sur la source. Le nouveau
+/// stub est ensuite écrit PAR-DESSUS app.asar en place (simple écrasement,
+/// pas de suppression/renommage du fichier lui-même) — un déplacement suivi
+/// d'un remplacement à l'identique ressemble justement au pattern que les
+/// protections anti-ransomware (dont celle de Windows Defender, active par
+/// défaut indépendamment du réglage "accès contrôlé aux dossiers") sont
+/// conçues pour repérer et bloquer.
 fn unpatch_dir(resources: &Path) -> io::Result<()> {
     let app_asar = resources.join("app.asar");
-    let app_asar_tmp = resources.join("app.asar.tmp");
     let backup = resources.join("_app.asar");
 
     if !backup.exists() {
@@ -153,12 +171,8 @@ fn unpatch_dir(resources: &Path) -> io::Result<()> {
         ));
     }
 
-    rename_with_retry(&app_asar, &app_asar_tmp)?;
-    if let Err(e) = rename_with_retry(&backup, &app_asar) {
-        let _ = fs::rename(&app_asar_tmp, &app_asar);
-        return Err(e);
-    }
-    let _ = fs::remove_file(&app_asar_tmp);
+    copy_with_retry(&backup, &app_asar)?;
+    let _ = fs::remove_file(&backup);
 
     Ok(())
 }
@@ -171,9 +185,9 @@ fn patch_dir(resources: &Path, patcher_path: &str, build_sha: Option<&str>) -> i
         unpatch_dir(resources)?;
     }
 
-    rename_with_retry(&app_asar, &backup)?;
-    if let Err(e) = asar::write_app_asar(&app_asar, patcher_path, build_sha) {
-        let _ = fs::rename(&backup, &app_asar);
+    copy_with_retry(&app_asar, &backup)?;
+    if let Err(e) = write_stub_with_retry(&app_asar, patcher_path, build_sha) {
+        let _ = copy_with_retry(&backup, &app_asar);
         return Err(e);
     }
 

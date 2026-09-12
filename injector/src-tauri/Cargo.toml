@@ -1,6 +1,6 @@
 [package]
 name = "abyss-injector"
-version = "0.2.5"
+version = "0.2.6"
 description = "Injecteur/patcheur pour Abyss (fork Vencord/Equicord) — projet Tauri indépendant"
 authors = ["lemonn"]
 edition = "2021"
