@@ -29,6 +29,13 @@ export interface FixResult {
     message?: string | null;
 }
 
+/// Miroir de patcher::UpdateResult (voir update_abyss_build).
+export interface UpdateResult {
+    branch: string;
+    updated: boolean;
+    message?: string | null;
+}
+
 /// Miroir de l'événement Tauri "install-progress" (voir patcher.rs).
 export interface InstallProgressEvent {
     branch: string;

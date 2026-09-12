@@ -444,12 +444,54 @@ pub async fn fix_abyss(app: AppHandle) -> Result<Vec<FixResult>, String> {
     Ok(results)
 }
 
-/// Force le retéléchargement du build Abyss public (bouton dédié des
-/// Réglages) — retourne le chemin en cache pour affichage/debug.
+#[derive(Serialize)]
+pub struct UpdateResult {
+    branch: String,
+    updated: bool,
+    message: Option<String>,
+}
+
+/// Retélécharge le build Abyss public ET réinjecte chaque install déjà
+/// patchée par Abyss avec ce nouveau build (bouton "mettre à jour" de la
+/// bannière liste).
+///
+/// Avant ce fix, cette commande ne faisait QUE rafraîchir le cache — elle ne
+/// touchait à aucun app.asar déjà patché. Le bouton semblait pourtant
+/// "réussir" (spinner puis bannière qui disparaît), donnant l'impression
+/// fausse que la mise à jour était appliquée, alors qu'il fallait en plus
+/// aller cliquer sur CHAQUE ligne Discord individuellement pour vraiment
+/// réinjecter — un ami a fini bloqué avec le statut "mettre à jour" qui ne
+/// bougeait jamais et aucun nouveau plugin, faute de connaître cette
+/// deuxième étape cachée.
 #[tauri::command]
-pub async fn update_abyss_build(app: AppHandle) -> Result<String, String> {
-    let path = dist_fetch::download_latest(&app).await?;
-    Ok(path.display().to_string())
+pub async fn update_abyss_build(app: AppHandle) -> Result<Vec<UpdateResult>, String> {
+    let patcher_path = dist_fetch::download_latest(&app).await?;
+    let sha = dist_fetch::cached_sha(&app);
+
+    let our_patcher_path = resolve_our_patcher_path(&app, None);
+    let installs = discord::find_discords(&our_patcher_path);
+
+    let mut results = Vec::new();
+    for install in installs {
+        if install.patch_owner != PatchOwner::Abyss {
+            continue;
+        }
+        let (Some(resources), Some(base)) = (&install.resources_path, &install.base_path) else {
+            continue;
+        };
+
+        kill_running(&install.branch);
+        let outcome = patch_dir(Path::new(resources), &patcher_path.to_string_lossy(), sha.as_deref());
+        kill_running(&install.branch);
+        let _ = relaunch(Path::new(base), &install.branch);
+
+        match outcome {
+            Ok(()) => results.push(UpdateResult { branch: install.branch, updated: true, message: None }),
+            Err(e) => results.push(UpdateResult { branch: install.branch, updated: false, message: Some(e.to_string()) }),
+        }
+    }
+
+    Ok(results)
 }
 
 /// Check manuel (en plus du check silencieux au lancement, voir

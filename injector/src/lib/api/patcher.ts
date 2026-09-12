@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { DiscordInstall, FixResult, InjectorSettings } from "../types";
+import type { DiscordInstall, FixResult, InjectorSettings, UpdateResult } from "../types";
 
 // Fine couche au-dessus de `invoke()` : le reste du frontend ne connaît pas
 // les noms exacts des commandes Tauri, juste cette API.
@@ -16,7 +16,7 @@ export const patcherApi = {
     unpatch: (resourcesPath: string, basePath: string, branch: string) =>
         invoke<void>("unpatch_discord", { resourcesPath, basePath, branch }),
 
-    updateAbyssBuild: () => invoke<string>("update_abyss_build"),
+    updateAbyssBuild: () => invoke<UpdateResult[]>("update_abyss_build"),
 
     checkAbyssBuildUpdate: () => invoke<string | null>("check_abyss_build_update"),
 

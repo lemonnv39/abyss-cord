@@ -165,6 +165,13 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   exited is a common cause), and the existing retry budget (~1.5s) wasn't
   always enough. Bumped to a much more generous ~6s of retries before
   actually giving up.
+- `injector/` (v0.2.4) — the "Mettre à jour Abyss" banner only refreshed the
+  cached build in the background, without ever re-injecting any already
+  Abyss-patched install: the button looked like it worked (spinner, banner
+  disappears) but nothing was actually applied — a real report from a friend
+  stuck permanently on "mettre à jour" with no new plugins ever landing. It
+  now re-patches every currently Abyss-owned install with the fresh build in
+  the same click.
 
 ### Removed
 - `SkinwalkerProfile` plugin, at the user's request.

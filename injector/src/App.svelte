@@ -90,8 +90,16 @@
         buildUpdating = true;
         globalError = null;
         try {
-            await patcherApi.updateAbyssBuild();
+            const results = await patcherApi.updateAbyssBuild();
+            const failures = results.filter(r => !r.updated);
+            if (failures.length > 0) {
+                globalError = failures.map(r => `${r.branch} : ${r.message ?? "échec inconnu"}`).join(" — ");
+            }
             buildUpdateAvailable = false;
+            // Réinjecté avec le nouveau build : rafraîchit build_sha par ligne
+            // pour que le statut "mettre à jour" disparaisse vraiment, au lieu
+            // de rester affiché malgré la mise à jour réelle.
+            await refreshInstalls();
         } catch (e) {
             globalError = String(e);
         } finally {
