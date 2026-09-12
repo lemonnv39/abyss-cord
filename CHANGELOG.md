@@ -10,6 +10,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Added
+- `VoiceChannelSearch`: a second search bar, "Search a user...", right below
+  the existing channel/server one — finds anyone currently in a voice
+  channel on any server you share with them (searched by username/display
+  name), with a direct Join button. Only searches people actually in voice
+  right now, not the client's entire known-user cache.
 - `VoiceTools` plugin: right-click a voice/stage channel for three red
   moderation actions — mute all, deafen all, disconnect all — real
   server-side actions (not a local mute), so each is labeled "(Permissions

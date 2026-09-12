@@ -27,11 +27,28 @@ interface VoiceChannel {
     memberIds?: string[];
 }
 
-let scanCache: VoiceChannel[] | null = null;
+// Une entrée par personne actuellement en vocal, sans plafond — contrairement
+// à VoiceChannel.memberIds (limité à 5, juste pour l'aperçu des avatars),
+// c'est cette liste complète qui permet à "chercher un utilisateur" de la
+// retrouver même dans un gros salon.
+interface VoiceMember {
+    userId: string;
+    channelId: string;
+    channelName: string;
+    guildId: string;
+    guildName: string;
+}
+
+interface ScanResult {
+    channels: VoiceChannel[];
+    voiceMembers: VoiceMember[];
+}
+
+let scanCache: ScanResult | null = null;
 let scanCacheAt = 0;
 const SCAN_TTL = 10000;
 
-async function scan(): Promise<VoiceChannel[]> {
+async function scan(): Promise<ScanResult> {
     if (scanCache && Date.now() - scanCacheAt < SCAN_TTL) return scanCache;
 
     return new Promise(resolve => {
@@ -39,6 +56,7 @@ async function scan(): Promise<VoiceChannel[]> {
             try {
                 const memberCount: Record<string, number> = {};
                 const memberIds: Record<string, string[]> = {};
+                const allMemberIds: Record<string, string[]> = {};
                 try {
                     const all: any = VoiceStateStore.getAllVoiceStates?.() ?? {};
                     for (const gId in all) {
@@ -48,6 +66,8 @@ async function scan(): Promise<VoiceChannel[]> {
                                 memberCount[cid] = (memberCount[cid] ?? 0) + 1;
                                 if (!memberIds[cid]) memberIds[cid] = [];
                                 if (memberIds[cid].length < 5) memberIds[cid].push(uId);
+                                if (!allMemberIds[cid]) allMemberIds[cid] = [];
+                                allMemberIds[cid].push(uId);
                             }
                         }
                     }
@@ -92,10 +112,29 @@ async function scan(): Promise<VoiceChannel[]> {
                 }
 
                 out.sort((a, b) => b.memberCount - a.memberCount || a.guildName.localeCompare(b.guildName));
-                scanCache = out;
+
+                // getAllVoiceStates() ne couvre QUE les guildes où le client
+                // local est lui-même présent — un hit ici est donc forcément
+                // dans une guilde qu'on a en commun avec la personne trouvée,
+                // sans calcul supplémentaire à faire.
+                const voiceMembers: VoiceMember[] = [];
+                for (const ch of out) {
+                    for (const uId of allMemberIds[ch.channelId] ?? []) {
+                        voiceMembers.push({
+                            userId: uId,
+                            channelId: ch.channelId,
+                            channelName: ch.channelName,
+                            guildId: ch.guildId,
+                            guildName: ch.guildName,
+                        });
+                    }
+                }
+
+                const result: ScanResult = { channels: out, voiceMembers };
+                scanCache = result;
                 scanCacheAt = Date.now();
-                resolve(out);
-            } catch { resolve([]); }
+                resolve(result);
+            } catch { resolve({ channels: [], voiceMembers: [] }); }
         }, 0);
     });
 }
@@ -122,9 +161,11 @@ function SpinnerIcon() {
     );
 }
 
-function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: VoiceChannel[] | null; }) {
+function VoiceSearchModal({ rootProps, channels, voiceMembers }: { rootProps: any; channels: VoiceChannel[] | null; voiceMembers: VoiceMember[]; }) {
     const [query, setQuery] = useState("");
     const [debouncedQuery, setDebouncedQuery] = useState("");
+    const [userQuery, setUserQuery] = useState("");
+    const [debouncedUserQuery, setDebouncedUserQuery] = useState("");
     const [joiningId, setJoiningId] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -133,21 +174,47 @@ function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: V
         return () => clearTimeout(handle);
     }, [query]);
 
+    useEffect(() => {
+        const handle = setTimeout(() => setDebouncedUserQuery(userQuery.trim().toLowerCase()), 80);
+        return () => clearTimeout(handle);
+    }, [userQuery]);
+
     const filtered = useMemo(() => {
         if (!channels) return null;
         if (!debouncedQuery) return channels;
         return channels.filter(c => c.searchIndex?.includes(debouncedQuery));
     }, [channels, debouncedQuery]);
 
+    // Ne cherche que parmi les gens ACTUELLEMENT en vocal (voiceMembers) —
+    // pas dans tout le cache d'utilisateurs connus du client, qui donnerait
+    // des dizaines de résultats sans rapport avec la question posée ("est-ce
+    // que cette personne est en vocal là, maintenant").
+    const matchedUsers = useMemo(() => {
+        if (!debouncedUserQuery) return [];
+        const results: Array<VoiceMember & { displayName: string; avatarUrl: string; }> = [];
+        for (const m of voiceMembers) {
+            const user = UserStore.getUser(m.userId);
+            if (!user) continue;
+            const displayName = user.globalName || user.username;
+            if (!displayName?.toLowerCase().includes(debouncedUserQuery) && !user.username?.toLowerCase().includes(debouncedUserQuery)) continue;
+            results.push({ ...m, displayName, avatarUrl: user.getAvatarURL(m.guildId, 32) });
+        }
+        return results;
+    }, [voiceMembers, debouncedUserQuery]);
+
     function handleQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
         setQuery(e.target.value);
     }
 
-    async function join(ch: VoiceChannel) {
+    function handleUserQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
+        setUserQuery(e.target.value);
+    }
+
+    async function join(channelId: string) {
         if (joiningId) return;
-        setJoiningId(ch.channelId);
+        setJoiningId(channelId);
         try {
-            ChannelActions.selectVoiceChannel(ch.channelId);
+            ChannelActions.selectVoiceChannel(channelId);
             await new Promise(r => setTimeout(r, 400));
         } catch { }
         setJoiningId(null);
@@ -196,6 +263,46 @@ function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: V
                                 </button>
                             )}
                         </div>
+                        <div className="vcs-search-bar">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.4, flexShrink: 0 }}>
+                                <path d="M12 12c2.7 0 8 1.34 8 4v2H4v-2c0-2.66 5.3-4 8-4Zm0-2a4 4 0 1 1 4-4 4 4 0 0 1-4 4Z" />
+                            </svg>
+                            <input
+                                className="vcs-search-input"
+                                placeholder="Search a user..."
+                                value={userQuery}
+                                onChange={handleUserQueryChange}
+                            />
+                            {userQuery && (
+                                <button className="vcs-search-clear" onClick={() => { setUserQuery(""); setDebouncedUserQuery(""); }}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
+                                </button>
+                            )}
+                        </div>
+                        {debouncedUserQuery && (
+                            <div className="vcs-user-results">
+                                {matchedUsers.length === 0 ? (
+                                    <div className="vcs-empty">Not in a shared voice channel right now</div>
+                                ) : matchedUsers.slice(0, 30).map(m => (
+                                    <div key={m.userId}
+                                        className="vcs-row"
+                                        onClick={() => join(m.channelId)}
+                                    >
+                                        <img src={m.avatarUrl} className="vcs-user-avatar" alt="" loading="lazy" />
+                                        <div className="vcs-info">
+                                            <span className="vcs-name">{m.displayName}</span>
+                                            <div className="vcs-guild">
+                                                <span className="vcs-guild-name">{m.channelName} · {m.guildName}</span>
+                                            </div>
+                                        </div>
+                                        {joiningId === m.channelId
+                                            ? <span className="vcs-joining-label">Joining...</span>
+                                            : <button className="vcs-join-btn" onClick={e => { e.stopPropagation(); join(m.channelId); }}>Join</button>
+                                        }
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div className="vcs-card">
                             <ScrollerThin fade className="vcs-channel-list">
                                 {displayList!.length === 0 && (
@@ -204,7 +311,7 @@ function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: V
                                 {displayList!.slice(0, 150).map(ch => (
                                     <div key={ch.channelId}
                                         className={`vcs-row${ch.canAccess ? "" : " vcs-row--locked"}`}
-                                        onClick={() => ch.canAccess && join(ch)}
+                                        onClick={() => ch.canAccess && join(ch.channelId)}
                                         title={ch.canAccess ? undefined : "No permission to join this channel"}
                                     >
                                         <span className="vcs-icon">
@@ -236,7 +343,7 @@ function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: V
                                         {joiningId === ch.channelId
                                             ? <span className="vcs-joining-label">Joining...</span>
                                             : ch.canAccess
-                                                ? <button className="vcs-join-btn" onClick={e => { e.stopPropagation(); join(ch); }}>Join</button>
+                                                ? <button className="vcs-join-btn" onClick={e => { e.stopPropagation(); join(ch.channelId); }}>Join</button>
                                                 : <span className="vcs-locked-label">Private</span>
                                         }
                                     </div>
@@ -256,16 +363,19 @@ function VoiceSearchModal({ rootProps, channels }: { rootProps: any; channels: V
 }
 
 function VoiceSearchModalWrapper({ rootProps }: { rootProps: any; }) {
-    const [channels, setChannels] = useState<VoiceChannel[] | null>(
-        scanCache && Date.now() - scanCacheAt < SCAN_TTL ? scanCache : null
-    );
+    const initial = scanCache && Date.now() - scanCacheAt < SCAN_TTL ? scanCache : null;
+    const [channels, setChannels] = useState<VoiceChannel[] | null>(initial?.channels ?? null);
+    const [voiceMembers, setVoiceMembers] = useState<VoiceMember[]>(initial?.voiceMembers ?? []);
 
     useEffect(() => {
         if (channels !== null) return;
-        scan().then(setChannels);
+        scan().then(result => {
+            setChannels(result.channels);
+            setVoiceMembers(result.voiceMembers);
+        });
     }, []);
 
-    return <VoiceSearchModal rootProps={rootProps} channels={channels} />;
+    return <VoiceSearchModal rootProps={rootProps} channels={channels} voiceMembers={voiceMembers} />;
 }
 
 function VCSHeaderButton() {
@@ -281,7 +391,7 @@ function VCSHeaderButton() {
 export default definePlugin({
     name: "VoiceChannelSearch",
     enabledByDefault: false,
-    description: "Search and join any voice channel across all your servers.",
+    description: "Search and join any voice channel across all your servers, or search a user by name to see which voice channel they're currently in on any server you share with them.",
     authors: [{ name: "0ctane", id: 0n }],
     dependencies: ["HeaderBarAPI"],
 
