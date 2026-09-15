@@ -8,7 +8,7 @@ import "./styles.css";
 
 import { DataStore } from "@api/index";
 import { HeaderBarButton } from "@api/HeaderBar";
-import { ChevronSmallDownIcon, CopyIcon, DeleteIcon, FolderIcon, OpenExternalIcon, PlusIcon, ShieldIcon } from "@components/Icons";
+import { ChevronSmallDownIcon, CopyIcon, DeleteIcon, FolderIcon, OpenExternalIcon, PlusIcon, ShieldIcon, UserIcon } from "@components/Icons";
 import { copyToClipboard } from "@utils/clipboard";
 import { classNameFactory } from "@utils/css";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
@@ -305,6 +305,30 @@ function avatarUrl(a: { id: string; avatar: string; discriminator: string; }): s
     return IconUtils.getDefaultAvatarURL(a.id, a.discriminator);
 }
 
+// Repli sur une icône générique si l'avatar ne charge pas (CDN bloqué,
+// compte dont l'avatar a changé/disparu depuis l'ajout du token, etc.) —
+// plutôt qu'une image cassée dans la liste.
+function AccountAvatar({ account }: { account: SavedAccount; }) {
+    const [failed, setFailed] = useState(false);
+
+    if (failed) {
+        return (
+            <div className={cl("avatar", "avatar-fallback")}>
+                <UserIcon width={20} height={20} />
+            </div>
+        );
+    }
+
+    return (
+        <img
+            className={cl("avatar")}
+            src={avatarUrl(account)}
+            alt=""
+            onError={() => setFailed(true)}
+        />
+    );
+}
+
 // Petits badges de statut (rond coloré + glyphe blanc), pour la liste de
 // résultats de vérification — plus lisible qu'une icône colorée flottant nue
 // à côté du texte.
@@ -387,7 +411,7 @@ function AccountRow({ account, onRemove, onRename }: { account: SavedAccount; on
                 ));
             }}
         >
-            <img className={cl("avatar")} src={avatarUrl(account)} alt="" />
+            <AccountAvatar account={account} />
             <div className={cl("row-info")}>
                 {editing ? (
                     <input
