@@ -8,14 +8,14 @@ import "./styles.css";
 
 import { DataStore } from "@api/index";
 import { HeaderBarButton } from "@api/HeaderBar";
-import { CopyIcon, DeleteIcon, FolderIcon, OpenExternalIcon, ShieldIcon } from "@components/Icons";
+import { ChevronSmallDownIcon, CopyIcon, DeleteIcon, FolderIcon, OpenExternalIcon, PlusIcon, ShieldIcon } from "@components/Icons";
 import { copyToClipboard } from "@utils/clipboard";
 import { classNameFactory } from "@utils/css";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin, { PluginNative } from "@utils/types";
 import { RenderModalProps } from "@vencord/discord-types";
 import { findByProps } from "@webpack";
-import { Button, Forms, IconUtils, React, TabBar, Toasts, useEffect, useState } from "@webpack/common";
+import { Button, ContextMenuApi, FluxDispatcher, Forms, IconUtils, Menu, React, TabBar, Toasts, useDrag, useDrop, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TokenImporter — ajoute/bascule entre TES PROPRES comptes Discord via un token
@@ -34,8 +34,10 @@ const cl = classNameFactory("vc-tokenimporter-");
 const Native = VencordNative.pluginHelpers.TokenImporter as PluginNative<typeof import("./native")>;
 
 const STORE_KEY = "tokenimporter-accounts";
+const STORE_KEY_FOLDERS = "tokenimporter-folders";
 const ENC_PREFIX = "ti-enc:";
 const TOKEN_REGEX = /(?:mfa\.[\w-]{84}|[\w-]{24,26}\.[\w-]{4,7}\.[\w-]{27,40})/g;
+const DRAG_TYPE_ACCOUNT = "vc_TokenImporterAccount";
 
 export interface SavedAccount {
     id: string;
@@ -43,6 +45,27 @@ export interface SavedAccount {
     username: string;
     discriminator: string;
     avatar: string;
+    // Absent/null = compte "non classé". Les comptes enregistrés avant cette
+    // fonctionnalité n'ont pas ce champ — ils tombent naturellement dans
+    // "Non classés" sans migration nécessaire.
+    folderId?: string | null;
+}
+
+export interface Folder {
+    id: string;
+    name: string;
+}
+
+function makeFolderId(): string {
+    return `folder-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function getFolders(): Promise<Folder[]> {
+    return (await DataStore.get<Folder[]>(STORE_KEY_FOLDERS)) ?? [];
+}
+
+async function saveFolders(folders: Folder[]): Promise<void> {
+    await DataStore.set(STORE_KEY_FOLDERS, folders);
 }
 
 interface CheckResult {
@@ -325,59 +348,280 @@ const enum Tab {
     Local
 }
 
-// ── Onglet "Comptes enregistrés" ───────────────────────────────────────────────
-function SavedAccountsTab({ accounts, loaded, onRemove }: {
+// Une ligne de compte, glissable vers n'importe quel en-tête de dossier — le
+// drag s'applique à toute la ligne (comme les favoris de ChannelTabs) plutôt
+// qu'à une poignée dédiée, react-dnd distingue déjà correctement un clic
+// (mousedown+mouseup immédiat) d'un vrai glissé.
+function AccountRow({ account, onRemove }: { account: SavedAccount; onRemove(id: string): void; }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [{ isDragging }, drag] = useDrag(() => ({
+        type: DRAG_TYPE_ACCOUNT,
+        item: () => ({ accountId: account.id }),
+        collect: (monitor: any) => ({ isDragging: !!monitor.isDragging() }),
+    }), [account.id]);
+    drag(ref);
+
+    return (
+        <div ref={ref} className={cl("row", { "row--dragging": isDragging })}>
+            <img className={cl("avatar")} src={avatarUrl(account)} alt="" />
+            <div className={cl("row-info")}>
+                <span className={cl("username")}>
+                    {account.username}{account.discriminator && account.discriminator !== "0" ? `#${account.discriminator}` : ""}
+                </span>
+                <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>
+            </div>
+            <div className={cl("row-actions")}>
+                <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => switchToAccount(account.token)}>
+                    Basculer
+                </Button>
+                <button className={cl("icon-btn")} title="Ouvrir dans une nouvelle fenêtre" onClick={() => openInStandaloneInstance(account)}>
+                    <OpenExternalIcon width={17} height={17} />
+                </button>
+                <button className={cl("icon-btn")} title="Copier le token" onClick={() => {
+                    copyToClipboard(account.token);
+                    Toasts.show({ message: "Token copié", type: Toasts.Type.SUCCESS, id: Toasts.genId() });
+                }}>
+                    <CopyIcon width={17} height={17} />
+                </button>
+                <button className={cl("icon-btn", "icon-btn--danger")} title="Supprimer" onClick={() => onRemove(account.id)}>
+                    <DeleteIcon width={17} height={17} />
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// En-tête de dossier réel : zone de dépôt + clic droit (renommer/supprimer) +
+// pli/dépli. Le renommage se fait en ligne (input à la place du texte) plutôt
+// que via une modale imbriquée dans la modale du plugin.
+function FolderSection({ folder, accounts, collapsed, editing, onToggleCollapsed, onStartRename, onCommitRename, onCancelRename, onDelete, onDropAccount, onRemoveAccount }: {
+    folder: Folder;
     accounts: SavedAccount[];
+    collapsed: boolean;
+    editing: boolean;
+    onToggleCollapsed(): void;
+    onStartRename(): void;
+    onCommitRename(name: string): void;
+    onCancelRename(): void;
+    onDelete(): void;
+    onDropAccount(accountId: string): void;
+    onRemoveAccount(id: string): void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [{ isOver, canDrop }, drop] = useDrop(() => ({
+        accept: DRAG_TYPE_ACCOUNT,
+        drop: (item: { accountId: string; }) => onDropAccount(item.accountId),
+        collect: (monitor: any) => ({ isOver: monitor.isOver(), canDrop: monitor.canDrop() }),
+    }), [onDropAccount]);
+    drop(ref);
+
+    const [nameDraft, setNameDraft] = useState(folder.name);
+    useEffect(() => { if (editing) setNameDraft(folder.name); }, [editing]);
+
+    function commit() {
+        onCommitRename(nameDraft);
+    }
+
+    return (
+        <div className={cl("folder")}>
+            <div
+                ref={ref}
+                className={cl("folder-header", { "folder-header--drop-target": isOver && canDrop })}
+                onContextMenu={e => {
+                    e.stopPropagation();
+                    ContextMenuApi.openContextMenu(e, () => (
+                        <Menu.Menu navId="tokenimporter-folder-menu" onClose={() => FluxDispatcher.dispatch({ type: "CONTEXT_MENU_CLOSE" })}>
+                            <Menu.MenuItem id="ti-rename-folder" label="Renommer" action={onStartRename} />
+                            <Menu.MenuItem id="ti-delete-folder" label="Supprimer le dossier" color="danger" action={onDelete} />
+                        </Menu.Menu>
+                    ));
+                }}
+            >
+                <button
+                    className={cl("folder-chevron", { "folder-chevron--collapsed": collapsed })}
+                    onClick={onToggleCollapsed}
+                >
+                    <ChevronSmallDownIcon width={14} height={14} />
+                </button>
+                <FolderIcon width={15} height={15} />
+                {editing ? (
+                    <input
+                        className={cl("folder-name-input")}
+                        autoFocus
+                        value={nameDraft}
+                        onChange={e => setNameDraft(e.currentTarget.value)}
+                        onClick={e => e.stopPropagation()}
+                        onBlur={commit}
+                        onKeyDown={e => {
+                            if (e.key === "Enter") commit();
+                            else if (e.key === "Escape") onCancelRename();
+                        }}
+                    />
+                ) : (
+                    <span className={cl("folder-name")} onClick={onToggleCollapsed}>{folder.name}</span>
+                )}
+                <span className={cl("folder-count")}>{accounts.length}</span>
+            </div>
+            {!collapsed && (
+                <div className={cl("folder-body")}>
+                    {accounts.length === 0
+                        ? <div className={cl("folder-empty")}>Glisse un compte ici</div>
+                        : accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemoveAccount} />)
+                    }
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Pseudo-dossier toujours présent — sans clic droit (rien à renommer/supprimer),
+// mais reste une cible de dépôt valide pour sortir un compte d'un vrai dossier.
+function UnsortedSection({ accounts, collapsed, onToggleCollapsed, onDropAccount, onRemoveAccount }: {
+    accounts: SavedAccount[];
+    collapsed: boolean;
+    onToggleCollapsed(): void;
+    onDropAccount(accountId: string): void;
+    onRemoveAccount(id: string): void;
+}) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [{ isOver, canDrop }, drop] = useDrop(() => ({
+        accept: DRAG_TYPE_ACCOUNT,
+        drop: (item: { accountId: string; }) => onDropAccount(item.accountId),
+        collect: (monitor: any) => ({ isOver: monitor.isOver(), canDrop: monitor.canDrop() }),
+    }), [onDropAccount]);
+    drop(ref);
+
+    return (
+        <div className={cl("folder")}>
+            <div ref={ref} className={cl("folder-header", "folder-header--unsorted", { "folder-header--drop-target": isOver && canDrop })}>
+                <button
+                    className={cl("folder-chevron", { "folder-chevron--collapsed": collapsed })}
+                    onClick={onToggleCollapsed}
+                >
+                    <ChevronSmallDownIcon width={14} height={14} />
+                </button>
+                <span className={cl("folder-name")} onClick={onToggleCollapsed}>Non classés</span>
+                <span className={cl("folder-count")}>{accounts.length}</span>
+            </div>
+            {!collapsed && (
+                <div className={cl("folder-body")}>
+                    {accounts.length === 0
+                        ? <div className={cl("folder-empty")}>Aucun compte non classé</div>
+                        : accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemoveAccount} />)
+                    }
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Onglet "Comptes enregistrés" ───────────────────────────────────────────────
+function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, onFoldersChange, onDeleteFolder }: {
+    accounts: SavedAccount[];
+    folders: Folder[];
     loaded: boolean;
     onRemove(id: string): void;
+    onMoveAccount(accountId: string, folderId: string | null): void;
+    onFoldersChange(folders: Folder[]): void;
+    onDeleteFolder(folderId: string): void;
 }) {
+    const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+    const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+
+    function toggleCollapsed(id: string) {
+        setCollapsedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
+
+    function addFolder() {
+        let name = "Nouveau dossier";
+        let n = 2;
+        const existingNames = new Set(folders.map(f => f.name));
+        while (existingNames.has(name)) name = `Nouveau dossier ${n++}`;
+
+        const folder: Folder = { id: makeFolderId(), name };
+        onFoldersChange([...folders, folder]);
+        setEditingFolderId(folder.id);
+    }
+
+    function renameFolder(id: string, name: string) {
+        const trimmed = name.trim();
+        setEditingFolderId(null);
+        if (!trimmed) return;
+        onFoldersChange(folders.map(f => f.id === id ? { ...f, name: trimmed } : f));
+    }
+
+    const accountsByFolder = useMemo(() => {
+        const map = new Map<string | null, SavedAccount[]>();
+        map.set(null, []);
+        for (const f of folders) map.set(f.id, []);
+        for (const a of accounts) {
+            const key = a.folderId && map.has(a.folderId) ? a.folderId : null;
+            map.get(key)!.push(a);
+        }
+        return map;
+    }, [accounts, folders]);
+
+    const hasFolders = folders.length > 0;
+
     return (
         <div className={cl("tab-content")}>
-            <Button
-                size={Button.Sizes.SMALL}
-                look={Button.Looks.OUTLINED}
-                color={Button.Colors.PRIMARY}
-                className={cl("my-token-btn")}
-                onClick={copyMyToken}
-            >
-                <CopyIcon width={16} height={16} /> Copier mon token actuel
-            </Button>
+            <div className={cl("saved-toolbar")}>
+                <Button
+                    size={Button.Sizes.SMALL}
+                    look={Button.Looks.OUTLINED}
+                    color={Button.Colors.PRIMARY}
+                    onClick={copyMyToken}
+                >
+                    <CopyIcon width={16} height={16} /> Copier mon token actuel
+                </Button>
+                <Button
+                    size={Button.Sizes.SMALL}
+                    look={Button.Looks.OUTLINED}
+                    color={Button.Colors.PRIMARY}
+                    onClick={addFolder}
+                >
+                    <PlusIcon width={16} height={16} /> Nouveau dossier
+                </Button>
+            </div>
 
             <div className={cl("card")}>
                 {!loaded ? (
                     <Forms.FormText className={cl("empty")}>Chargement...</Forms.FormText>
-                ) : accounts.length === 0 ? (
+                ) : accounts.length === 0 && folders.length === 0 ? (
                     <Forms.FormText className={cl("empty")}>Aucun compte — ajoute un token dans l'onglet "Ajouter un token".</Forms.FormText>
-                ) : (
+                ) : !hasFolders ? (
                     <div className={cl("list")}>
-                        {accounts.map(a => (
-                            <div key={a.id} className={cl("row")}>
-                                <img className={cl("avatar")} src={avatarUrl(a)} alt="" />
-                                <div className={cl("row-info")}>
-                                    <span className={cl("username")}>
-                                        {a.username}{a.discriminator && a.discriminator !== "0" ? `#${a.discriminator}` : ""}
-                                    </span>
-                                    <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>
-                                </div>
-                                <div className={cl("row-actions")}>
-                                    <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => switchToAccount(a.token)}>
-                                        Basculer
-                                    </Button>
-                                    <button className={cl("icon-btn")} title="Ouvrir dans une nouvelle fenêtre" onClick={() => openInStandaloneInstance(a)}>
-                                        <OpenExternalIcon width={17} height={17} />
-                                    </button>
-                                    <button className={cl("icon-btn")} title="Copier le token" onClick={() => {
-                                        copyToClipboard(a.token);
-                                        Toasts.show({ message: "Token copié", type: Toasts.Type.SUCCESS, id: Toasts.genId() });
-                                    }}>
-                                        <CopyIcon width={17} height={17} />
-                                    </button>
-                                    <button className={cl("icon-btn", "icon-btn--danger")} title="Supprimer" onClick={() => onRemove(a.id)}>
-                                        <DeleteIcon width={17} height={17} />
-                                    </button>
-                                </div>
-                            </div>
+                        {accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemove} />)}
+                    </div>
+                ) : (
+                    <div className={cl("folder-list")}>
+                        {folders.map(folder => (
+                            <FolderSection
+                                key={folder.id}
+                                folder={folder}
+                                accounts={accountsByFolder.get(folder.id) ?? []}
+                                collapsed={collapsedIds.has(folder.id)}
+                                editing={editingFolderId === folder.id}
+                                onToggleCollapsed={() => toggleCollapsed(folder.id)}
+                                onStartRename={() => setEditingFolderId(folder.id)}
+                                onCommitRename={name => renameFolder(folder.id, name)}
+                                onCancelRename={() => setEditingFolderId(null)}
+                                onDelete={() => onDeleteFolder(folder.id)}
+                                onDropAccount={accountId => onMoveAccount(accountId, folder.id)}
+                                onRemoveAccount={onRemove}
+                            />
                         ))}
+                        <UnsortedSection
+                            accounts={accountsByFolder.get(null) ?? []}
+                            collapsed={collapsedIds.has("__unsorted")}
+                            onToggleCollapsed={() => toggleCollapsed("__unsorted")}
+                            onDropAccount={accountId => onMoveAccount(accountId, null)}
+                            onRemoveAccount={onRemove}
+                        />
                     </div>
                 )}
             </div>
@@ -475,16 +719,44 @@ function AddTokenTab({ onAdded }: { onAdded(accounts: SavedAccount[]): void; }) 
 function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
     const [tab, setTab] = useState<Tab>(Tab.Saved);
     const [accounts, setAccounts] = useState<SavedAccount[]>([]);
+    const [folders, setFolders] = useState<Folder[]>([]);
     const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
-        getAccounts().then(v => { setAccounts(v); setLoaded(true); });
+        Promise.all([getAccounts(), getFolders()]).then(([v, f]) => {
+            setAccounts(v);
+            setFolders(f);
+            setLoaded(true);
+        });
     }, []);
 
     async function removeAccount(id: string) {
         const updated = accounts.filter(a => a.id !== id);
         setAccounts(updated);
         await saveAccounts(updated);
+    }
+
+    async function moveAccount(accountId: string, folderId: string | null) {
+        const updated = accounts.map(a => a.id === accountId ? { ...a, folderId } : a);
+        setAccounts(updated);
+        await saveAccounts(updated);
+    }
+
+    async function changeFolders(updated: Folder[]) {
+        setFolders(updated);
+        await saveFolders(updated);
+    }
+
+    // Supprime le dossier ET rebascule ses comptes vers "Non classés" en un
+    // seul état cohérent — fait ici plutôt que via N appels à moveAccount()
+    // depuis SavedAccountsTab, qui capturerait `accounts` obsolète à chaque
+    // appel et perdrait tous les déplacements sauf le dernier.
+    async function deleteFolder(folderId: string) {
+        const updatedFolders = folders.filter(f => f.id !== folderId);
+        const updatedAccounts = accounts.map(a => a.folderId === folderId ? { ...a, folderId: null } : a);
+        setFolders(updatedFolders);
+        setAccounts(updatedAccounts);
+        await Promise.all([saveFolders(updatedFolders), saveAccounts(updatedAccounts)]);
     }
 
     return (
@@ -519,7 +791,17 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
             </TabBar>
 
             <ModalContent className={cl("content")}>
-                {tab === Tab.Saved && <SavedAccountsTab accounts={accounts} loaded={loaded} onRemove={removeAccount} />}
+                {tab === Tab.Saved && (
+                    <SavedAccountsTab
+                        accounts={accounts}
+                        folders={folders}
+                        loaded={loaded}
+                        onRemove={removeAccount}
+                        onMoveAccount={moveAccount}
+                        onFoldersChange={changeFolders}
+                        onDeleteFolder={deleteFolder}
+                    />
+                )}
                 {tab === Tab.Add && <AddTokenTab onAdded={setAccounts} />}
                 {tab === Tab.Local && <LocalInstallsTab />}
             </ModalContent>

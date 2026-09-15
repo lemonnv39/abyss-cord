@@ -10,6 +10,10 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Added
+- `TokenImporter`: folder organization for saved accounts — right-click a
+  folder to rename or delete it, drag an account onto any folder (or onto
+  "Non classés") to move it there. Deleting a folder keeps its accounts,
+  moving them back to unclassified rather than losing them.
 - `VoiceChannelSearch`: a second search bar, "Search a user...", right below
   the existing channel/server one — finds anyone currently in a voice
   channel on any server you share with them (searched by username/display

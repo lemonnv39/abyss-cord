@@ -112,6 +112,148 @@
     gap: 8px;
 }
 
+.vc-tokenimporter-saved-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.vc-tokenimporter-saved-toolbar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Folders ────────────────────────────────────────────────────────────── */
+
+.vc-tokenimporter-folder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.vc-tokenimporter-folder {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vc-tokenimporter-folder-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vc-tokenimporter-folder-header:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.vc-tokenimporter-folder-header--unsorted {
+    background: transparent;
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.vc-tokenimporter-folder-header--drop-target {
+    border-color: #5865f2;
+    background: rgba(88, 101, 242, 0.12);
+}
+
+.vc-tokenimporter-folder-chevron {
+    background: none;
+    border: none;
+    color: #949ba4;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    flex-shrink: 0;
+    transition: transform 0.15s ease, color 0.12s ease;
+}
+
+.vc-tokenimporter-folder-chevron:hover {
+    color: #ffffff;
+}
+
+.vc-tokenimporter-folder-chevron--collapsed {
+    transform: rotate(-90deg);
+}
+
+.vc-tokenimporter-folder-header > svg {
+    color: #949ba4;
+    flex-shrink: 0;
+}
+
+.vc-tokenimporter-folder-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: #dbdee1;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-tokenimporter-folder-header--unsorted .vc-tokenimporter-folder-name {
+    color: #949ba4;
+}
+
+.vc-tokenimporter-folder-name-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: #1e1f22;
+    color: #dbdee1;
+    border: 1px solid #5865f2;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 13px;
+    font-weight: 600;
+    outline: none;
+}
+
+.vc-tokenimporter-folder-count {
+    color: #949ba4;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 1px 7px;
+    flex-shrink: 0;
+}
+
+.vc-tokenimporter-folder-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 14px;
+    border-left: 2px solid rgba(255, 255, 255, 0.06);
+    margin-left: 10px;
+}
+
+.vc-tokenimporter-folder-empty {
+    color: #6d6f78;
+    font-size: 12px;
+    font-style: italic;
+    padding: 8px 10px;
+}
+
+.vc-tokenimporter-row--dragging {
+    opacity: 0.4;
+}
+
 /* ── Account / install rows ─────────────────────────────────────────────── */
 
 .vc-tokenimporter-list {
