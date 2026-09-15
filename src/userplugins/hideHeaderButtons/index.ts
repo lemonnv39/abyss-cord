@@ -20,6 +20,13 @@
  * Robuste aux traductions (Aide/Help, Boîte de réception/Inbox) puisqu'on ne
  * touche jamais à un texte affiché, juste à une constante interne.
  *
+ * "HELP"=== apparaît PLUSIEURS FOIS dans ce module (pour d'autres usages
+ * sans rapport) — un premier essai qui matchait juste la chaîne nue sans
+ * contexte a neutralisé la mauvaise occurrence et n'a rien caché du tout.
+ * Le lookahead ci-dessous exige exactement le même contexte que le regex de
+ * HeaderBarAPI (`===...jusqu'à 75 caractères...{})`) pour être sûr de viser
+ * l'occurrence RÉELLEMENT liée à l'affichage du bouton, pas une autre.
+ *
  * Deux patches séparés (même `find`, `replacement` différent chacun) plutôt
  * qu'un tableau sur un seul patch : si le nom exact du type "Inbox" change
  * un jour côté Discord et que ce patch précis cesse de matcher, l'autre
@@ -38,15 +45,15 @@ export default definePlugin({
         {
             find: '?"BACK_FORWARD_NAVIGATION":',
             replacement: {
-                match: /"HELP"===/,
-                replace: '"__ABYSS_HELP_HIDDEN__"===',
+                match: /"HELP"(?====.{0,75}\{\}\))/,
+                replace: '"__ABYSS_HELP_HIDDEN__"',
             },
         },
         {
             find: '?"BACK_FORWARD_NAVIGATION":',
             replacement: {
-                match: /"INBOX"===/,
-                replace: '"__ABYSS_INBOX_HIDDEN__"===',
+                match: /"INBOX"(?====.{0,75}\{\}\))/,
+                replace: '"__ABYSS_INBOX_HIDDEN__"',
             },
         },
     ],
