@@ -222,6 +222,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   plain file copy (only needs read access to the source, never an exclusive
   lock) and the new stub is written directly in place over `app.asar`
   instead of swapping files by name.
+- `injector/` (v0.2.7) — a freshly reinstalled Discord Canary still hit
+  "Accès refusé" with the v0.2.6 copy-based fix, while a stable install
+  installed slightly earlier succeeded — a completely new, never-scanned
+  file is exactly the slowest case for an antivirus cloud reputation
+  lookup, and 20s wasn't always enough. Retry window extended to ~45s.
 
 ### Removed
 - `SkinwalkerProfile` plugin, at the user's request.

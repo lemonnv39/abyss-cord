@@ -99,18 +99,22 @@ pub(crate) fn relaunch_branches(branches: &[&str]) {
 /// Réessaie une opération fichier plusieurs fois avant d'abandonner — juste
 /// après avoir tué Discord (ou l'avoir relancé nous-mêmes puis re-tué pour un
 /// patch rapproché), Windows peut garder un fichier verrouillé plus
-/// longtemps que le délai fixe de kill_running. Budget généreux (~20s) plutôt
-/// qu'un échec direct : un patch prend de toute façon déjà plusieurs
-/// secondes, quelques secondes de retry silencieux valent largement mieux
-/// qu'un message d'erreur déroutant pour l'utilisateur.
+/// longtemps que le délai fixe de kill_running. Budget généreux (~45s) plutôt
+/// qu'un échec direct : observé en vrai qu'une toute première install de
+/// Discord CANARY (fichier tout juste réinstallé, jamais vu par l'antivirus)
+/// pouvait dépasser les 20s précédents alors qu'une install stable installée
+/// un peu plus tôt passait sans souci — la vérification de réputation cloud
+/// d'un fichier totalement neuf est justement le cas le plus lent. Un patch
+/// prend de toute façon déjà plusieurs secondes ; quelques dizaines de
+/// secondes de retry silencieux valent largement mieux qu'un échec direct.
 fn retry_io<F: FnMut() -> io::Result<()>>(mut op: F) -> io::Result<()> {
     let mut last_err = None;
-    for attempt in 0..40 {
+    for attempt in 0..90 {
         match op() {
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_err = Some(e);
-                if attempt < 39 {
+                if attempt < 89 {
                     thread::sleep(Duration::from_millis(500));
                 }
             }
