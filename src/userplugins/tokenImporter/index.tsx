@@ -352,7 +352,7 @@ const enum Tab {
 // drag s'applique à toute la ligne (comme les favoris de ChannelTabs) plutôt
 // qu'à une poignée dédiée, react-dnd distingue déjà correctement un clic
 // (mousedown+mouseup immédiat) d'un vrai glissé.
-function AccountRow({ account, onRemove }: { account: SavedAccount; onRemove(id: string): void; }) {
+function AccountRow({ account, onRemove, onRename }: { account: SavedAccount; onRemove(id: string): void; onRename(id: string, name: string): void; }) {
     const ref = useRef<HTMLDivElement>(null);
     const [{ isDragging }, drag] = useDrag(() => ({
         type: DRAG_TYPE_ACCOUNT,
@@ -361,13 +361,52 @@ function AccountRow({ account, onRemove }: { account: SavedAccount; onRemove(id:
     }), [account.id]);
     drag(ref);
 
+    // Renomme uniquement l'étiquette locale (le "username" stocké côté
+    // plugin) — ne touche jamais au vrai pseudo Discord du compte, qui reste
+    // celui vu à la dernière vérification du token.
+    const [editing, setEditing] = useState(false);
+    const [nameDraft, setNameDraft] = useState(account.username);
+    useEffect(() => { if (editing) setNameDraft(account.username); }, [editing]);
+
+    function commit() {
+        const trimmed = nameDraft.trim();
+        setEditing(false);
+        if (trimmed && trimmed !== account.username) onRename(account.id, trimmed);
+    }
+
     return (
-        <div ref={ref} className={cl("row", { "row--dragging": isDragging })}>
+        <div
+            ref={ref}
+            className={cl("row", { "row--dragging": isDragging })}
+            onContextMenu={e => {
+                e.stopPropagation();
+                ContextMenuApi.openContextMenu(e, () => (
+                    <Menu.Menu navId="tokenimporter-account-menu" onClose={() => FluxDispatcher.dispatch({ type: "CONTEXT_MENU_CLOSE" })}>
+                        <Menu.MenuItem id="ti-rename-account" label="Renommer" action={() => setEditing(true)} />
+                    </Menu.Menu>
+                ));
+            }}
+        >
             <img className={cl("avatar")} src={avatarUrl(account)} alt="" />
             <div className={cl("row-info")}>
-                <span className={cl("username")}>
-                    {account.username}{account.discriminator && account.discriminator !== "0" ? `#${account.discriminator}` : ""}
-                </span>
+                {editing ? (
+                    <input
+                        className={cl("account-name-input")}
+                        autoFocus
+                        value={nameDraft}
+                        onChange={e => setNameDraft(e.currentTarget.value)}
+                        onClick={e => e.stopPropagation()}
+                        onBlur={commit}
+                        onKeyDown={e => {
+                            if (e.key === "Enter") commit();
+                            else if (e.key === "Escape") setEditing(false);
+                        }}
+                    />
+                ) : (
+                    <span className={cl("username")}>
+                        {account.username}{account.discriminator && account.discriminator !== "0" ? `#${account.discriminator}` : ""}
+                    </span>
+                )}
                 <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>
             </div>
             <div className={cl("row-actions")}>
@@ -394,7 +433,7 @@ function AccountRow({ account, onRemove }: { account: SavedAccount; onRemove(id:
 // En-tête de dossier réel : zone de dépôt + clic droit (renommer/supprimer) +
 // pli/dépli. Le renommage se fait en ligne (input à la place du texte) plutôt
 // que via une modale imbriquée dans la modale du plugin.
-function FolderSection({ folder, accounts, collapsed, editing, onToggleCollapsed, onStartRename, onCommitRename, onCancelRename, onDelete, onDropAccount, onRemoveAccount }: {
+function FolderSection({ folder, accounts, collapsed, editing, onToggleCollapsed, onStartRename, onCommitRename, onCancelRename, onDelete, onDropAccount, onRemoveAccount, onRenameAccount }: {
     folder: Folder;
     accounts: SavedAccount[];
     collapsed: boolean;
@@ -406,6 +445,7 @@ function FolderSection({ folder, accounts, collapsed, editing, onToggleCollapsed
     onDelete(): void;
     onDropAccount(accountId: string): void;
     onRemoveAccount(id: string): void;
+    onRenameAccount(id: string, name: string): void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const [{ isOver, canDrop }, drop] = useDrop(() => ({
@@ -466,7 +506,7 @@ function FolderSection({ folder, accounts, collapsed, editing, onToggleCollapsed
                 <div className={cl("folder-body")}>
                     {accounts.length === 0
                         ? <div className={cl("folder-empty")}>Glisse un compte ici</div>
-                        : accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemoveAccount} />)
+                        : accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemoveAccount} onRename={onRenameAccount} />)
                     }
                 </div>
             )}
@@ -476,12 +516,13 @@ function FolderSection({ folder, accounts, collapsed, editing, onToggleCollapsed
 
 // Pseudo-dossier toujours présent — sans clic droit (rien à renommer/supprimer),
 // mais reste une cible de dépôt valide pour sortir un compte d'un vrai dossier.
-function UnsortedSection({ accounts, collapsed, onToggleCollapsed, onDropAccount, onRemoveAccount }: {
+function UnsortedSection({ accounts, collapsed, onToggleCollapsed, onDropAccount, onRemoveAccount, onRenameAccount }: {
     accounts: SavedAccount[];
     collapsed: boolean;
     onToggleCollapsed(): void;
     onDropAccount(accountId: string): void;
     onRemoveAccount(id: string): void;
+    onRenameAccount(id: string, name: string): void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const [{ isOver, canDrop }, drop] = useDrop(() => ({
@@ -507,7 +548,7 @@ function UnsortedSection({ accounts, collapsed, onToggleCollapsed, onDropAccount
                 <div className={cl("folder-body")}>
                     {accounts.length === 0
                         ? <div className={cl("folder-empty")}>Aucun compte non classé</div>
-                        : accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemoveAccount} />)
+                        : accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemoveAccount} onRename={onRenameAccount} />)
                     }
                 </div>
             )}
@@ -516,7 +557,7 @@ function UnsortedSection({ accounts, collapsed, onToggleCollapsed, onDropAccount
 }
 
 // ── Onglet "Comptes enregistrés" ───────────────────────────────────────────────
-function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, onFoldersChange, onDeleteFolder }: {
+function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, onFoldersChange, onDeleteFolder, onRenameAccount }: {
     accounts: SavedAccount[];
     folders: Folder[];
     loaded: boolean;
@@ -524,6 +565,7 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
     onMoveAccount(accountId: string, folderId: string | null): void;
     onFoldersChange(folders: Folder[]): void;
     onDeleteFolder(folderId: string): void;
+    onRenameAccount(id: string, name: string): void;
 }) {
     const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
     const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -595,7 +637,7 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                     <Forms.FormText className={cl("empty")}>Aucun compte — ajoute un token dans l'onglet "Ajouter un token".</Forms.FormText>
                 ) : !hasFolders ? (
                     <div className={cl("list")}>
-                        {accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemove} />)}
+                        {accounts.map(a => <AccountRow key={a.id} account={a} onRemove={onRemove} onRename={onRenameAccount} />)}
                     </div>
                 ) : (
                     <div className={cl("folder-list")}>
@@ -613,6 +655,7 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                                 onDelete={() => onDeleteFolder(folder.id)}
                                 onDropAccount={accountId => onMoveAccount(accountId, folder.id)}
                                 onRemoveAccount={onRemove}
+                                onRenameAccount={onRenameAccount}
                             />
                         ))}
                         <UnsortedSection
@@ -621,6 +664,7 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                             onToggleCollapsed={() => toggleCollapsed("__unsorted")}
                             onDropAccount={accountId => onMoveAccount(accountId, null)}
                             onRemoveAccount={onRemove}
+                            onRenameAccount={onRenameAccount}
                         />
                     </div>
                 )}
@@ -742,6 +786,12 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
         await saveAccounts(updated);
     }
 
+    async function renameAccount(accountId: string, name: string) {
+        const updated = accounts.map(a => a.id === accountId ? { ...a, username: name } : a);
+        setAccounts(updated);
+        await saveAccounts(updated);
+    }
+
     async function changeFolders(updated: Folder[]) {
         setFolders(updated);
         await saveFolders(updated);
@@ -800,6 +850,7 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
                         onMoveAccount={moveAccount}
                         onFoldersChange={changeFolders}
                         onDeleteFolder={deleteFolder}
+                        onRenameAccount={renameAccount}
                     />
                 )}
                 {tab === Tab.Add && <AddTokenTab onAdded={setAccounts} />}
