@@ -90,7 +90,12 @@ const settings = definePluginSettings({
     debitEleve: {
         type: OptionType.BOOLEAN,
         description: "Relever le débit vocal de TA connexion micro (son plus riche, moins compressé). N'affecte ni le partage d'écran ni les autres membres du salon.",
-        default: false,
+        // C'est CE réglage qui fait toute la différence audible (pas les 4
+        // options de traitement au-dessus, surtout perceptibles sur de la
+        // musique) — le laisser à false par défaut donnait l'impression que
+        // le plugin "ne changeait rien" tant qu'on ne trouvait pas ce toggle
+        // séparé du reste.
+        default: true,
         onChange: () => applique(),
     },
     debitCibleKbps: {
@@ -98,7 +103,7 @@ const settings = definePluginSettings({
         description: "Débit visé en kbps (le salon peut plafonner plus bas selon son niveau de boost — Discord applique alors son propre maximum sans erreur).",
         markers: [64, 96, 128, 192, 256, 320, 384, 510],
         stickToMarkers: true,
-        default: 128,
+        default: 256,
         onChange: () => applique(),
     },
 });

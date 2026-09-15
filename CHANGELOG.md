@@ -114,6 +114,12 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   match ("icône muette, micro actif" / "icône sourde, audio actif").
 
 ### Fixed
+- `MicroStudio`'s actual audible feature — raising the voice bitrate — was
+  off by default, hidden behind a toggle separate from the four DSP options
+  (echo/noise/gain/Krisp) that people naturally reach for first. Those four
+  mostly matter for music, not speech, so enabling only them and expecting
+  a "LightCord-like" richer sound produced no noticeable change. Bitrate
+  boost now defaults to on at 256kbps.
 - `NewPluginsManager` was disabled in settings — re-enabled; it's what shows
   the "New Plugins and Settings" popup on connect when plugins are added.
 - `TokenImporter`'s "Comptes locaux" tab: the "Ouvrir" button used
