@@ -60,6 +60,7 @@ let avant: {
     bruit: boolean;
     gain: boolean;
     krisp: boolean;
+    sousSysteme: string;
 } | null = null;
 
 const settings = definePluginSettings({
@@ -104,6 +105,17 @@ const settings = definePluginSettings({
         markers: [64, 96, 128, 192, 256, 320, 384, 510],
         stickToMarkers: true,
         default: 256,
+        onChange: () => applique(),
+    },
+    sousSystemeAudio: {
+        type: OptionType.SELECT,
+        description: "Pipeline audio utilisé par Discord — \"Expérimental\" est un moteur plus récent que Discord fait cohabiter avec l'ancien ; le nom ne garantit pas un meilleur son, juste un chemin de traitement différent. À toi de comparer.",
+        options: [
+            { label: "Automatique (défaut Discord)", value: "automatic", default: true },
+            { label: "Standard", value: "standard" },
+            { label: "Expérimental", value: "experimental" },
+            { label: "Ancien (legacy)", value: "legacy" },
+        ],
         onChange: () => applique(),
     },
 });
@@ -152,14 +164,16 @@ function releve() {
     if (avant) return;
     try {
         const s: any = MediaEngineStore;
+        const moteur: any = s.getMediaEngine?.();
         avant = {
             echo: s.getEchoCancellation?.() ?? true,
             bruit: s.getNoiseSuppression?.() ?? true,
             gain: s.getAutomaticGainControl?.() ?? true,
             krisp: s.getNoiseCancellation?.() ?? true,
+            sousSysteme: moteur?.getAudioSubsystem?.() ?? "automatic",
         };
     } catch {
-        avant = { echo: true, bruit: true, gain: true, krisp: true };
+        avant = { echo: true, bruit: true, gain: true, krisp: true, sousSysteme: "automatic" };
     }
 }
 
@@ -180,6 +194,18 @@ function applique(actif = true) {
             krisp: !s.sansKrisp,
         }
         : (avant ?? { echo: true, bruit: true, gain: true, krisp: true });
+
+    // Réglage du MOTEUR, pas d'une connexion précise (contrairement à tout le
+    // reste ci-dessous) — queueAudioSubsystem() est la voie documentée pour un
+    // changement en douceur (appliqué à la prochaine connexion plutôt qu'en
+    // direct sur un appel en cours) ; setAudioSubsystem() en filet de secours
+    // pour les versions de Discord qui n'exposeraient que celle-ci.
+    const moteur: any = MediaEngineStore.getMediaEngine?.();
+    if (moteur) {
+        const sousSysteme = actif ? (s.sousSystemeAudio ?? "automatic") : (avant?.sousSysteme ?? "automatic");
+        pose(() => moteur.queueAudioSubsystem(sousSysteme));
+        pose(() => moteur.setAudioSubsystem(sousSysteme));
+    }
 
     for (const c of connexionsMicro()) {
         pose(() => c.setEchoCancellation(voulu.echo));
@@ -210,7 +236,7 @@ function pose(action: () => void) {
 export default definePlugin({
     name: "MicroStudio",
     description:
-        "Coupe les traitements que Discord applique à TON micro (suppression de bruit, écho, gain auto, Krisp) et relève en option le débit vocal — pour envoyer de la musique sans qu'elle soit rabotée. N'agit que sur ta connexion vocale : ni le partage d'écran, ni les autres membres du salon, ni le nombre de canaux ne sont touchés (ce dernier n'est de toute façon exposé nulle part par Discord — négocié serveur). Les réglages se posent en rejoignant un salon vocal.",
+        "Coupe les traitements que Discord applique à TON micro (suppression de bruit, écho, gain auto, Krisp), relève le débit vocal, et permet de tester le pipeline audio \"Expérimental\" de Discord. N'agit que sur ta connexion vocale : ni le partage d'écran, ni les autres membres du salon, ni le nombre de canaux ne sont touchés (ce dernier n'est de toute façon exposé nulle part par Discord — négocié serveur). Les réglages se posent en rejoignant un salon vocal.",
     tags: ["Voice", "Media"],
     authors: [{ name: "0ctane", id: 0n }],
     settings,

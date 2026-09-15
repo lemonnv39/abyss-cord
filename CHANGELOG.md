@@ -10,6 +10,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Added
+- `MicroStudio`: a dropdown to switch Discord's audio pipeline itself
+  (Automatic/Standard/Experimental/Legacy, via the documented
+  `queueAudioSubsystem`/`setAudioSubsystem` engine API) — for comparing
+  against the DSP/bitrate settings the plugin already controlled. Reverts
+  to whatever was active before on disable, same as the other settings.
 - `TokenImporter`: folder organization for saved accounts — right-click a
   folder to rename or delete it, drag an account onto any folder (or onto
   "Non classés") to move it there. Deleting a folder keeps its accounts,
