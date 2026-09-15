@@ -10,6 +10,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Added
+- `HideHeaderButtons` plugin: hides the native "Help" and "Inbox" buttons
+  from the top-right toolbar, purely cosmetic. Neutralizes the internal
+  type constant each button's visibility check compares against, rather
+  than hiding by CSS/aria-label — stays correct regardless of client
+  language.
 - `MicroStudio`: a dropdown to switch Discord's audio pipeline itself
   (Automatic/Standard/Experimental/Legacy, via the documented
   `queueAudioSubsystem`/`setAudioSubsystem` engine API) — for comparing
