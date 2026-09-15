@@ -567,11 +567,16 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
     onDeleteFolder(folderId: string): void;
     onRenameAccount(id: string, name: string): void;
 }) {
-    const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+    // On retient les dossiers DÉPLIÉS plutôt que repliés — un Set vide au
+    // départ replie donc tout par défaut (dossiers ET "Non classés"), quel
+    // que soit le nombre de dossiers et même s'ils arrivent après le premier
+    // rendu (chargement asynchrone). Tout replié fait mieux ressentir le
+    // rangement qu'une pile de comptes tous ouverts en même temps.
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
 
-    function toggleCollapsed(id: string) {
-        setCollapsedIds(prev => {
+    function toggleExpanded(id: string) {
+        setExpandedIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id); else next.add(id);
             return next;
@@ -587,6 +592,9 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
         const folder: Folder = { id: makeFolderId(), name };
         onFoldersChange([...folders, folder]);
         setEditingFolderId(folder.id);
+        // Un dossier tout neuf est vide — le montrer déplié évite un clic en
+        // plus pour voir "Glisse un compte ici" juste après l'avoir créé.
+        setExpandedIds(prev => new Set(prev).add(folder.id));
     }
 
     function renameFolder(id: string, name: string) {
@@ -646,9 +654,9 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                                 key={folder.id}
                                 folder={folder}
                                 accounts={accountsByFolder.get(folder.id) ?? []}
-                                collapsed={collapsedIds.has(folder.id)}
+                                collapsed={!expandedIds.has(folder.id)}
                                 editing={editingFolderId === folder.id}
-                                onToggleCollapsed={() => toggleCollapsed(folder.id)}
+                                onToggleCollapsed={() => toggleExpanded(folder.id)}
                                 onStartRename={() => setEditingFolderId(folder.id)}
                                 onCommitRename={name => renameFolder(folder.id, name)}
                                 onCancelRename={() => setEditingFolderId(null)}
@@ -660,8 +668,8 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                         ))}
                         <UnsortedSection
                             accounts={accountsByFolder.get(null) ?? []}
-                            collapsed={collapsedIds.has("__unsorted")}
-                            onToggleCollapsed={() => toggleCollapsed("__unsorted")}
+                            collapsed={!expandedIds.has("__unsorted")}
+                            onToggleCollapsed={() => toggleExpanded("__unsorted")}
                             onDropAccount={accountId => onMoveAccount(accountId, null)}
                             onRemoveAccount={onRemove}
                             onRenameAccount={onRenameAccount}
