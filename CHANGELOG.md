@@ -9,6 +9,13 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ## [Unreleased]
 
+### Fixed
+- Restored the `SkinwalkerProfile` plugin, dropped by mistake when the two
+  source repos were reconciled. The multitool enables it and then reads the
+  `skinwalker-profile.json` it writes, so without it the Profile studio
+  silently did nothing — the same failure mode that was already found and
+  fixed once before. Its badge and `PluginCard` hook were never missing.
+
 ### Removed
 - The standalone Tauri injector (`injector/`) and its two release workflows.
   Installing, reinstalling, uninstalling and re-injecting after a Discord
