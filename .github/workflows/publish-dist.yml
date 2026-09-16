@@ -3,9 +3,13 @@ name: Publish dist to the builds branch
 # Pousse le build (patcher.js/preload.js/renderer.js/renderer.css) sur une
 # branche dédiée ("builds") DU MÊME repo, plutôt que vers un repo externe —
 # ça évite toute clé de déploiement : le GITHUB_TOKEN par défaut a déjà les
-# droits d'écriture sur ce repo (voir `permissions` ci-dessous). L'injecteur
-# (injector/src-tauri/src/dist_fetch.rs) lit ensuite ces 4 fichiers via
-# raw.githubusercontent.com/lemonnv39/abyss-cord/builds/.
+# droits d'écriture sur ce repo (voir `permissions` ci-dessous).
+#
+# ATTENTION : cette branche `builds` n'est PLUS ce qui est livré aux
+# utilisateurs. La dist réellement injectée vient du repo jumeau
+# `0ctane6/abyss`, dont la CI pousse vers `0ctane6/abyss-builds`, seul repo
+# que le multitool « Skin Walker » télécharge. Ce workflow-ci ne sert donc
+# plus que de copie de secours de notre côté.
 
 on:
   push:

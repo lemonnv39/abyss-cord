@@ -5,46 +5,20 @@ fork de [Vencord](https://github.com/Vendicated/Vencord)), un mod client pour
 Discord. Ce fichier documente la structure réelle du repo et les règles à
 suivre pour toute intervention future.
 
-## Sous-projet indépendant : `injector/`
+## Où vit ce repo, et comment Abyss arrive chez l'utilisateur
 
-`injector/` est un **projet Tauri v2 à part entière** (Rust + Svelte 5/
-TypeScript), pas une extension du reste du repo. Il vit à la racine du repo
-pour des raisons de commodité (un seul checkout, un seul historique git),
-mais tout le reste de ce document — structure `src/`, conventions
-TypeScript/React/Vencord, règles de build (`build.mjs`), etc. — **ne
-s'applique pas** à `injector/`. Ses propres conventions sont documentées
-dans [injector/README.md](injector/README.md).
+Le code est maintenu à l'identique sur deux repos : `lemonnv39/abyss-cord`
+(`main`) et `0ctane6/abyss` (`master`). **Toute mise à jour se pousse sur
+les deux** — c'est `0ctane6/abyss` qui est branché sur la chaîne de
+livraison : sa CI (`publish-dist.yml`) build la dist et la pousse vers le
+repo public `0ctane6/abyss-builds`, d'où le multitool « Skin Walker »
+(`0ctane6/multitool`, onglet Discord → espace Abyss) la télécharge pour
+l'injecter. Une modif poussée seulement ici n'atteint jamais un vrai
+Discord.
 
-Points clés à retenir :
-
-- **Stack séparée** : Rust (backend `src-tauri/`) + Svelte 5 avec runes
-  (`src/`), gérée avec `pnpm` + `cargo`/`tauri` — aucune dépendance ni
-  import croisé avec `src/` du projet principal (TypeScript/Vencord).
-- **Rôle** : reproduit en Rust la logique de l'installeur officiel
-  [Vencord/Installer](https://github.com/Vencord/Installer) (Go) — détection
-  des installs Discord, patch/dépatch de `app.asar` — avec une UI Tauri au
-  lieu de la CLI/GUI Go d'origine. Par défaut, `patcher.js` est téléchargé
-  depuis la branche `builds` de CE MÊME repo (alimentée par
-  `publish-dist.yml` à chaque push sur `main` — pas besoin de clé de
-  déploiement, le `GITHUB_TOKEN` par défaut suffit puisque c'est le même
-  repo) plutôt que lu depuis un clone local : c'est ce qui permet d'envoyer
-  l'`.exe` de l'injecteur à quelqu'un qui n'a ni le repo ni Node — un
-  chemin de repo local reste possible en override optionnel pour tester un
-  build non poussé.
-- **Mise à jour** : passe par `tauri-plugin-updater` officiel (pas de fetch
-  GitHub custom), avec sa propre paire de clés de signature — **jamais**
-  commit la clé privée. Voir `injector/README.md` pour la génération des
-  clés et la configuration des secrets GitHub Actions.
-- **CI séparée** : `.github/workflows/release.yml` (déclenché par un tag
-  `injector-vX.Y.Z`) ne construit et ne release QUE `injector/`. Il vit à la
-  racine `.github/workflows/` par contrainte GitHub (un workflow dans un
-  sous-dossier n'est jamais exécuté), mais n'a aucune interaction avec
-  `publish-dist.yml` (qui build la dist Abyss elle-même, déclenché
-  différemment — push sur `master`).
-- **Versionning séparé** : `injector/package.json` et
-  `injector/src-tauri/Cargo.toml` ont leur propre numéro de version,
-  indépendant de `version.json` à la racine (qui suit Abyss, pas
-  l'injecteur).
+L'ancien injecteur Tauri autonome (`injector/`) est **retiré** : install,
+réinstall, désinstall et ré-injection auto après une MAJ de Discord sont
+maintenant gérées par le multitool.
 
 ## Pourquoi ce repo n'est PAS réorganisé "from scratch"
 

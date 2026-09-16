@@ -9,6 +9,14 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ## [Unreleased]
 
+### Removed
+- The standalone Tauri injector (`injector/`) and its two release workflows.
+  Installing, reinstalling, uninstalling and re-injecting after a Discord
+  update are now handled by the Skin Walker multitool's Abyss panel, which
+  pulls the built dist from `0ctane6/abyss-builds`. The source now lives in
+  two mirrored repos (`lemonnv39/abyss-cord`, `0ctane6/abyss`) and every
+  update goes to both — only the latter feeds that delivery chain.
+
 ### Added
 - `HideHeaderButtons` plugin: hides the native "Help" and "Inbox" buttons
   from the top-right toolbar, purely cosmetic.
