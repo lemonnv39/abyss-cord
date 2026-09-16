@@ -8,29 +8,34 @@
  * Cache les boutons natifs "Aide" et "Boîte de réception" de la barre du
  * haut — juste pour un client plus épuré, aucune fonctionnalité derrière.
  *
- * Discord construit cette barre comme une série de tests "TYPE"===x, chacun
- * suivi d'un bouton réel ou d'un objet vide {} si la condition est fausse
- * (voir HeaderBarAPI, qui s'accroche juste après le test "HELP"===... dans
- * ce même module — find: '?"BACK_FORWARD_NAVIGATION":'). Plutôt que de
- * réécrire tout le ternaire (dont on ne connaît pas le détail exact d'une
- * version à l'autre), on change juste la CHAÎNE comparée : le test ne peut
- * alors plus jamais être vrai, la branche vide est prise à sa place, le
- * reste de la barre (tout le reste du tableau) n'est jamais touché.
+ * v1 et v2 de ce plugin ciblaient une chaîne "HELP"/"INBOX" utilisée pour
+ * calculer `h`, une valeur passée en `focusSectionProps` — un détail
+ * d'ACCESSIBILITÉ CLAVIER (quelle section du header reçoit le focus en
+ * premier), sans aucun rapport avec l'affichage réel des boutons. Neutraliser
+ * cette chaîne ne cachait donc rien, quelle que soit la précision du
+ * contexte du regex : la mauvaise variable était visée depuis le début.
  *
- * Robuste aux traductions (Aide/Help, Boîte de réception/Inbox) puisqu'on ne
- * touche jamais à un texte affiché, juste à une constante interne.
+ * Vérifié directement dans le vrai bundle Discord (web, même code que le
+ * client desktop pour ce composant) — le rendu réel ressemble à :
+ *   leading:  [A && jsx(BackForward, {focusSectionProps: "BACK_FORWARD_NAVIGATION"===h?e:void 0}),
+ *              s && jsx(InboxButton, {focusSectionProps: "NOTIFICATIONS_INBOX"===h?e:void 0}), ...]
+ *   trailing: [..., n ? jsx(HelpA,{focusSectionProps:"HELP"===h?e:void 0})
+ *                    : jsx(HelpB,{focusSectionProps:"HELP"===h?e:void 0}), ...]
+ * Le bouton Inbox est gardé par un simple `s &&` (facile à neutraliser en
+ * `false`). Le bouton Aide, lui, est un ternaire qui rend TOUJOURS l'un des
+ * deux composants (`n ? A : B`) — impossible de le cacher via un booléen,
+ * il faut remplacer le ternaire entier par `null`.
  *
- * "HELP"=== apparaît PLUSIEURS FOIS dans ce module (pour d'autres usages
- * sans rapport) — un premier essai qui matchait juste la chaîne nue sans
- * contexte a neutralisé la mauvaise occurrence et n'a rien caché du tout.
- * Le lookahead ci-dessous exige exactement le même contexte que le regex de
- * HeaderBarAPI (`===...jusqu'à 75 caractères...{})`) pour être sûr de viser
- * l'occurrence RÉELLEMENT liée à l'affichage du bouton, pas une autre.
+ * Les noms de variables minifiés (s, n, h, e, A, les composants) changent à
+ * chaque build Discord — les regex ci-dessous ne s'appuient donc QUE sur les
+ * chaînes stables ("NOTIFICATIONS_INBOX", "HELP", "focusSectionProps",
+ * "void 0") avec des \w+ pour tout le reste, exactement comme le fait
+ * HeaderBarAPI (find: '?"BACK_FORWARD_NAVIGATION":') pour repérer ce module.
  *
  * Deux patches séparés (même `find`, `replacement` différent chacun) plutôt
- * qu'un tableau sur un seul patch : si le nom exact du type "Inbox" change
- * un jour côté Discord et que ce patch précis cesse de matcher, l'autre
- * (Help) continue de s'appliquer indépendamment au lieu de tomber avec lui.
+ * qu'un tableau sur un seul patch : si l'un des deux cesse un jour de
+ * matcher (renommage côté Discord), l'autre continue de s'appliquer
+ * indépendamment au lieu de tomber avec lui.
  */
 
 import definePlugin from "@utils/types";
@@ -43,17 +48,19 @@ export default definePlugin({
 
     patches: [
         {
+            // Bouton "Boîte de réception" : simple garde `s && jsx(...)` -> false.
             find: '?"BACK_FORWARD_NAVIGATION":',
             replacement: {
-                match: /"HELP"(?====.{0,75}\{\}\))/,
-                replace: '"__ABYSS_HELP_HIDDEN__"',
+                match: /\w+&&\(0,\w+\.jsx\)\(\w+,\{focusSectionProps:"NOTIFICATIONS_INBOX"===\w+\?\w+:void 0\}\)/,
+                replace: "false",
             },
         },
         {
+            // Bouton "Aide" : ternaire qui rend toujours quelque chose -> null.
             find: '?"BACK_FORWARD_NAVIGATION":',
             replacement: {
-                match: /"INBOX"(?====.{0,75}\{\}\))/,
-                replace: '"__ABYSS_INBOX_HIDDEN__"',
+                match: /\w+\?\(0,\w+\.jsx\)\(\w+,\{focusSectionProps:"HELP"===\w+\?\w+:void 0\}\):\(0,\w+\.jsx\)\(\w+,\{focusSectionProps:"HELP"===\w+\?\w+:void 0\}\)/,
+                replace: "null",
             },
         },
     ],

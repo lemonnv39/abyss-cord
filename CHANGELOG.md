@@ -15,6 +15,16 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   type constant each button's visibility check compares against, rather
   than hiding by CSS/aria-label — stays correct regardless of client
   language.
+
+### Fixed
+- `HideHeaderButtons`: v1/v2 patched the wrong variable entirely (an
+  accessibility focus-order string, unrelated to actual button rendering)
+  so neither button ever actually hid. Re-derived the real render logic
+  from Discord's own bundle: Inbox is a plain `bool && <Button/>` guard
+  (now forced to `false`), Help is a ternary that always renders one of
+  two variants (now replaced outright with `null`). Both regexes anchor
+  only on stable literal tokens (`"NOTIFICATIONS_INBOX"`, `"HELP"`,
+  `focusSectionProps`) with wildcards for the minified names around them.
 - `MicroStudio`: a dropdown to switch Discord's audio pipeline itself
   (Automatic/Standard/Experimental/Legacy, via the documented
   `queueAudioSubsystem`/`setAudioSubsystem` engine API) — for comparing
