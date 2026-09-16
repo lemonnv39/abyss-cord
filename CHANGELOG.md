@@ -11,20 +11,20 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ### Added
 - `HideHeaderButtons` plugin: hides the native "Help" and "Inbox" buttons
-  from the top-right toolbar, purely cosmetic. Neutralizes the internal
-  type constant each button's visibility check compares against, rather
-  than hiding by CSS/aria-label — stays correct regardless of client
-  language.
+  from the top-right toolbar, purely cosmetic.
 
 ### Fixed
 - `HideHeaderButtons`: v1/v2 patched the wrong variable entirely (an
   accessibility focus-order string, unrelated to actual button rendering)
-  so neither button ever actually hid. Re-derived the real render logic
-  from Discord's own bundle: Inbox is a plain `bool && <Button/>` guard
-  (now forced to `false`), Help is a ternary that always renders one of
-  two variants (now replaced outright with `null`). Both regexes anchor
-  only on stable literal tokens (`"NOTIFICATIONS_INBOX"`, `"HELP"`,
-  `focusSectionProps`) with wildcards for the minified names around them.
+  so neither button ever actually hid. v3 re-derived the real render logic
+  from Discord's bundle and fixed "Help" (a ternary always rendering one of
+  two variants, replaced with `null`) — confirmed working live. The same
+  approach for "Inbox" (neutralizing its `bool && <Button/>` guard) still
+  didn't hide it in practice despite matching the captured source exactly,
+  most likely a newer/alternate variant of that component on this account.
+  Switched Inbox to a CSS rule on `[aria-label="Boîte de réception"]`
+  instead — reliable regardless of which component renders it, at the cost
+  of being tied to the French label.
 - `MicroStudio`: a dropdown to switch Discord's audio pipeline itself
   (Automatic/Standard/Experimental/Legacy, via the documented
   `queueAudioSubsystem`/`setAudioSubsystem` engine API) — for comparing

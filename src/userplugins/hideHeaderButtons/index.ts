@@ -8,37 +8,33 @@
  * Cache les boutons natifs "Aide" et "Boîte de réception" de la barre du
  * haut — juste pour un client plus épuré, aucune fonctionnalité derrière.
  *
- * v1 et v2 de ce plugin ciblaient une chaîne "HELP"/"INBOX" utilisée pour
- * calculer `h`, une valeur passée en `focusSectionProps` — un détail
- * d'ACCESSIBILITÉ CLAVIER (quelle section du header reçoit le focus en
- * premier), sans aucun rapport avec l'affichage réel des boutons. Neutraliser
- * cette chaîne ne cachait donc rien, quelle que soit la précision du
- * contexte du regex : la mauvaise variable était visée depuis le début.
+ * v1 et v2 ciblaient une chaîne "HELP"/"INBOX" utilisée pour calculer `h`,
+ * une valeur passée en `focusSectionProps` (accessibilité clavier, sans
+ * rapport avec l'affichage). v3 a corrigé ça pour "Aide" (confirmé en jeu :
+ * un ternaire qui rend toujours l'un de deux composants, remplacé par
+ * `null`), et a aussi neutralisé le garde `s&&jsx(...)` du bouton Inbox
+ * classique ("NOTIFICATIONS_INBOX"). Résultat en jeu : Aide disparaît bel et
+ * bien, mais Boîte de réception reste affichée quand même — donc soit ce
+ * compte a une variante plus récente de ce composant (rollout Discord type
+ * "Orbs"/expérimentations vues dans le même bundle) gérée par un chemin de
+ * code différent, soit le patch touche la bonne variable mais Discord monte
+ * un DEUXIÈME bouton équivalent ailleurs. Confirmé aussi : `toString()` sur
+ * une factory webpack patchée renvoie TOUJOURS le code d'origine en
+ * production (Vencord le fait exprès), donc impossible de vérifier via la
+ * console si un patch a param pris ou non sur ce compte — vérification
+ * uniquement possible visuellement.
  *
- * Vérifié directement dans le vrai bundle Discord (web, même code que le
- * client desktop pour ce composant) — le rendu réel ressemble à :
- *   leading:  [A && jsx(BackForward, {focusSectionProps: "BACK_FORWARD_NAVIGATION"===h?e:void 0}),
- *              s && jsx(InboxButton, {focusSectionProps: "NOTIFICATIONS_INBOX"===h?e:void 0}), ...]
- *   trailing: [..., n ? jsx(HelpA,{focusSectionProps:"HELP"===h?e:void 0})
- *                    : jsx(HelpB,{focusSectionProps:"HELP"===h?e:void 0}), ...]
- * Le bouton Inbox est gardé par un simple `s &&` (facile à neutraliser en
- * `false`). Le bouton Aide, lui, est un ternaire qui rend TOUJOURS l'un des
- * deux composants (`n ? A : B`) — impossible de le cacher via un booléen,
- * il faut remplacer le ternaire entier par `null`.
- *
- * Les noms de variables minifiés (s, n, h, e, A, les composants) changent à
- * chaque build Discord — les regex ci-dessous ne s'appuient donc QUE sur les
- * chaînes stables ("NOTIFICATIONS_INBOX", "HELP", "focusSectionProps",
- * "void 0") avec des \w+ pour tout le reste, exactement comme le fait
- * HeaderBarAPI (find: '?"BACK_FORWARD_NAVIGATION":') pour repérer ce module.
- *
- * Deux patches séparés (même `find`, `replacement` différent chacun) plutôt
- * qu'un tableau sur un seul patch : si l'un des deux cesse un jour de
- * matcher (renommage côté Discord), l'autre continue de s'appliquer
- * indépendamment au lieu de tomber avec lui.
+ * Plutôt que de continuer à deviner la structure JS exacte, "Boîte de
+ * réception" est cachée par CSS sur son aria-label (voir hideBugReport.css
+ * dans experiments/ pour un précédent dans ce repo) — fiable quelle que soit
+ * la variante de composant utilisée, seul inconvénient : dépend du texte
+ * affiché, donc du français ici (client toujours en FR).
  */
 
+import { disableStyle, enableStyle } from "@api/Styles";
 import definePlugin from "@utils/types";
+
+import hideInboxStyle from "./hideInbox.css?managed";
 
 export default definePlugin({
     name: "HideHeaderButtons",
@@ -48,14 +44,6 @@ export default definePlugin({
 
     patches: [
         {
-            // Bouton "Boîte de réception" : simple garde `s && jsx(...)` -> false.
-            find: '?"BACK_FORWARD_NAVIGATION":',
-            replacement: {
-                match: /\w+&&\(0,\w+\.jsx\)\(\w+,\{focusSectionProps:"NOTIFICATIONS_INBOX"===\w+\?\w+:void 0\}\)/,
-                replace: "false",
-            },
-        },
-        {
             // Bouton "Aide" : ternaire qui rend toujours quelque chose -> null.
             find: '?"BACK_FORWARD_NAVIGATION":',
             replacement: {
@@ -64,4 +52,7 @@ export default definePlugin({
             },
         },
     ],
+
+    start: () => enableStyle(hideInboxStyle),
+    stop: () => disableStyle(hideInboxStyle),
 });
