@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { app, BrowserWindow, net, safeStorage } from "electron";
+import { app, BrowserWindow, dialog, net, safeStorage } from "electron";
 import { spawn } from "child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join } from "path";
 
 // Vérifie un token en interrogeant l'API officielle Discord (lecture seule,
@@ -71,6 +71,44 @@ export async function decryptToken(_: any, encryptedBase64: string): Promise<str
 // pas proprement l'état interne de Discord après un changement de token.
 export function reload(_: any): void {
     BrowserWindow.getFocusedWindow()?.webContents.reload();
+}
+
+// ── Export des tokens vers des .txt (un fichier par dossier) ────────────────────
+// Écrit des fichiers en CLAIR à la demande explicite de l'utilisateur, dans un
+// dossier qu'il choisit lui-même via le sélecteur natif — on n'écrit jamais à
+// un emplacement en dur ni sans dialogue. Ce sont ses propres tokens, déjà
+// déchiffrés côté renderer ; ce module ne fait que les poser sur le disque.
+// Nom de fichier = nom du dossier, nettoyé des caractères interdits Windows.
+function sanitizeFileName(name: string): string {
+    return (name || "export").replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").trim() || "export";
+}
+
+export async function exportTokens(
+    _: any,
+    groups: { name: string; accounts: { username: string; token: string; }[]; }[],
+): Promise<{ ok: boolean; count?: number; dir?: string; error?: string; }> {
+    try {
+        const win = BrowserWindow.getFocusedWindow();
+        const opts = {
+            title: "Choisir le dossier où exporter les tokens",
+            properties: ["openDirectory", "createDirectory"] as any,
+        };
+        const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+        if (result.canceled || !result.filePaths.length) return { ok: false, error: "canceled" };
+
+        const dir = result.filePaths[0];
+        let count = 0;
+        for (const group of groups) {
+            if (!group.accounts.length) continue;
+            const lines = group.accounts.map(a => `account name: ${a.username} | token -> ${a.token}`);
+            // CRLF pour une lecture propre dans le Bloc-notes Windows.
+            writeFileSync(join(dir, `${sanitizeFileName(group.name)}.txt`), lines.join("\r\n") + "\r\n", "utf8");
+            count++;
+        }
+        return { ok: true, count, dir };
+    } catch (e: any) {
+        return { ok: false, error: e?.message ?? "exception" };
+    }
 }
 
 // ── Lancer une autre install Discord locale (onglet "Comptes locaux") ──────────

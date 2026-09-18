@@ -9,6 +9,14 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ## [Unreleased]
 
+### Added
+- `TokenImporter`: an "Exporter en .txt" button in the saved-accounts
+  toolbar. Writes one `.txt` per folder (named after the folder, plus one
+  for unsorted accounts) into a directory you pick via the native folder
+  picker, one line per account: `account name: <pseudo> | token -> <token>`.
+  Tokens are written in clear text on purpose — it's an explicit export of
+  your own accounts, so keep the files private.
+
 ### Fixed
 - Restored the `SkinwalkerProfile` plugin, dropped by mistake when the two
   source repos were reconciled. The multitool enables it and then reads the

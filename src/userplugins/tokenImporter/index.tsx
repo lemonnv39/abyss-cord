@@ -639,6 +639,39 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
         return map;
     }, [accounts, folders]);
 
+    // Un .txt par dossier (nommé comme le dossier), plus un fichier pour les
+    // comptes non classés. Les tokens sont déjà en clair ici (getAccounts les
+    // déchiffre au chargement) — le natif ne fait que les écrire dans le
+    // dossier que l'utilisateur choisit. Format demandé, une ligne par compte :
+    //   account name: <pseudo> | token -> <token>
+    async function exportToTxt() {
+        const groups = folders.map(f => ({
+            name: f.name,
+            accounts: (accountsByFolder.get(f.id) ?? []).map(a => ({ username: a.username, token: a.token })),
+        }));
+        const unsorted = accountsByFolder.get(null) ?? [];
+        if (unsorted.length) {
+            groups.push({ name: "Non classés", accounts: unsorted.map(a => ({ username: a.username, token: a.token })) });
+        }
+
+        const nonEmpty = groups.filter(g => g.accounts.length > 0);
+        if (!nonEmpty.length) {
+            Toasts.show({ message: "Aucun compte à exporter.", type: Toasts.Type.MESSAGE, id: Toasts.genId() });
+            return;
+        }
+
+        const res = await Native.exportTokens(nonEmpty);
+        if (res.ok) {
+            Toasts.show({
+                message: `${res.count} fichier${res.count! > 1 ? "s" : ""} exporté${res.count! > 1 ? "s" : ""} (tokens en clair).`,
+                type: Toasts.Type.SUCCESS,
+                id: Toasts.genId(),
+            });
+        } else if (res.error !== "canceled") {
+            Toasts.show({ message: `Échec de l'export : ${res.error}`, type: Toasts.Type.FAILURE, id: Toasts.genId() });
+        }
+    }
+
     const hasFolders = folders.length > 0;
 
     return (
@@ -659,6 +692,14 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                     onClick={addFolder}
                 >
                     <PlusIcon width={16} height={16} /> Nouveau dossier
+                </Button>
+                <Button
+                    size={Button.Sizes.SMALL}
+                    look={Button.Looks.OUTLINED}
+                    color={Button.Colors.PRIMARY}
+                    onClick={exportToTxt}
+                >
+                    <OpenExternalIcon width={16} height={16} /> Exporter en .txt
                 </Button>
             </div>
 
