@@ -5,7 +5,7 @@
  */
 
 import { app, BrowserWindow, ipcMain, session } from "electron";
-import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 
 // Bundled at build time as base64 by the `file://` loader (scripts/build/
@@ -28,6 +28,50 @@ const openWindows = new Map<string, BrowserWindow>();
 const activePreloads = new Set<string>();
 
 const VALID_DOMAINS = new Set(["discord.com", "ptb.discord.com", "canary.discord.com"]);
+
+// Journal de diagnostic (userData/abyss-mi-debug.log). Sert à comprendre les
+// fenêtres bloquées en chargement sans DevTools : on y consigne les étapes et
+// les erreurs de rendu de chaque instance. Silencieux, jamais fatal.
+function miLog(...args: any[]): void {
+    try {
+        const parts = args.map(a => (typeof a === "string" ? a : (() => { try { return JSON.stringify(a); } catch { return String(a); } })()));
+        appendFileSync(join(app.getPath("userData"), "abyss-mi-debug.log"), `[${new Date().toISOString()}] ${parts.join(" ")}\n`);
+    } catch { }
+}
+
+// Écrit le token dans TOUS les storages possibles, en résistant au fait que
+// Discord retire `window.localStorage` (anti-vol de token) : si l'accès direct
+// échoue, on repasse par un iframe about:blank (même origine, storage vivant).
+// Renvoyé sous forme de source à exécuter dans la page (preload + réinjection).
+function tokenInjectSource(token: string): string {
+    const cleanTok = String(token || "").trim().replace(/^"+|"+$/g, "");
+    const safeTok = JSON.stringify(cleanTok);
+    return `(function(){
+        try {
+            var raw = ${safeTok};
+            if (!raw || raw === "undefined") return;
+            var q = JSON.stringify(raw);
+            function setLS(k, v){
+                try { window.localStorage.setItem(k, v); return true; } catch(e){}
+                try {
+                    var f = document.createElement("iframe");
+                    f.style.display = "none";
+                    (document.body || document.documentElement).appendChild(f);
+                    f.contentWindow.localStorage.setItem(k, v);
+                    f.remove();
+                    return true;
+                } catch(e){}
+                return false;
+            }
+            setLS("token", q);
+            setLS("default_token", q);
+            if ((location.pathname.indexOf("/login") >= 0 || location.pathname === "/") && !window.__mi_redirected) {
+                window.__mi_redirected = true;
+                location.href = "https://discord.com/channels/@me";
+            }
+        } catch(e){}
+    })();`;
+}
 
 // Rotates red → black → green → red... across successive detached instances,
 // so each one is visually distinct from the main window (Discord's blue,
@@ -154,25 +198,8 @@ function createTokenPreload(token: string): string {
         }
     } catch { }
 
-    const cleanToken = String(token || "").trim().replace(/^"+|"+$/g, "");
-    const tokenLiteral = JSON.stringify(cleanToken);
-
-    const innerLines = [
-        "(function() {",
-        "  var RAW_TOKEN = " + tokenLiteral + ";",
-        "  if (!RAW_TOKEN || RAW_TOKEN === 'undefined') return;",
-        "  var q = JSON.stringify(RAW_TOKEN);",
-        "  try { localStorage.setItem('token', q); } catch(e) {}",
-        "  try { localStorage.setItem('default_token', q); } catch(e) {}",
-        "  try {",
-        "    if ((location.pathname.indexOf('/login') >= 0 || location.pathname === '/') && !window.__mi_redirected) {",
-        "      window.__mi_redirected = true;",
-        "      location.href = 'https://discord.com/channels/@me';",
-        "    }",
-        "  } catch(e) {}",
-        "})();"
-    ].join("\n");
-    const innerLiteral = JSON.stringify(innerLines);
+    // Même logique d'injection robuste (avec repli iframe) que la réinjection.
+    const innerLiteral = JSON.stringify(tokenInjectSource(token));
 
     const script = [
         "// Abyss MultiInstance - token preload",
@@ -318,24 +345,41 @@ export async function openInstanceWindow(
 
         // Redundant injection: the preload sets the token before Discord even
         // starts, but we repeat it on every (re)navigation just in case (e.g.
-        // reconnect after a network drop).
-        const cleanTok = String(token || "").trim().replace(/^"+|"+$/g, "");
-        const safeTok = JSON.stringify(cleanTok);
-        const injectJs = `(function(){
-            try {
-                var raw = ${safeTok};
-                if (!raw || raw === "undefined") return;
-                var q = JSON.stringify(raw);
-                localStorage.setItem("token", q);
-                localStorage.setItem("default_token", q);
-                if ((location.pathname.indexOf("/login") >= 0 || location.pathname === "/") && !window.__mi_redirected) {
-                    window.__mi_redirected = true;
-                    location.href = "https://discord.com/channels/@me";
-                }
-            } catch(e) {}
-        })();`;
+        // reconnect after a network drop). Same robust helper (iframe fallback)
+        // so it still lands even once Discord has removed window.localStorage.
+        const injectJs = tokenInjectSource(token);
         wc.on("dom-ready", () => wc.executeJavaScript(injectJs).catch(() => { }));
         wc.on("did-navigate", () => wc.executeJavaScript(injectJs).catch(() => { }));
+
+        // ── Diagnostic + récupération ──────────────────────────────────────
+        // Bloqué en chargement token valide : on trace la cause et, si l'app
+        // n'a pas monté après un délai, on recharge UNE fois (souvent une course
+        // au premier boot d'une session neuve, réglée dès que le token est là).
+        miLog("open", userId, "domain=" + domain, "hasToken=" + !!token);
+        wc.on("did-fail-load", (_e, code, desc, url) => miLog("did-fail-load", userId, code, desc, url));
+        wc.on("render-process-gone", (_e, details) => miLog("render-process-gone", userId, details));
+        wc.on("preload-error", (_e, path, err) => miLog("preload-error", userId, path, String(err)));
+        wc.on("unresponsive", () => miLog("unresponsive", userId));
+        wc.on("did-finish-load", () => miLog("did-finish-load", userId));
+
+        let recovered = false;
+        const probeJs = `(function(){try{return JSON.stringify({href:location.href,title:document.title,hasChat:!!document.querySelector('[class*="chat"],[class*="chatContent"]'),hasLogin:!!(document.querySelector('input[name="email"]')||document.querySelector('[class*="authBox"]')),spinner:!!document.querySelector('[class*="initialLoad"],[class*="loadingScreen"],[class*="spinner"]')});}catch(e){return "probe-error:"+e;}})();`;
+        setTimeout(async () => {
+            if (win.isDestroyed()) return;
+            try {
+                const raw = await wc.executeJavaScript(probeJs);
+                miLog("watchdog@15s", userId, raw);
+                const st = typeof raw === "string" && raw[0] === "{" ? JSON.parse(raw) : null;
+                if (!recovered && (!st || !st.hasChat)) {
+                    recovered = true;
+                    miLog("watchdog reload-once", userId);
+                    if (!win.isDestroyed()) wc.reload();
+                }
+            } catch (e) {
+                miLog("watchdog probe failed", userId, String(e));
+                if (!recovered && !win.isDestroyed()) { recovered = true; miLog("watchdog reload after probe fail", userId); try { wc.reload(); } catch { } }
+            }
+        }, 15000);
 
         wc.on("page-title-updated", (e, title) => {
             const clean = title.replace(/^\(\d+\)\s*/, "").replace(/\s*\[.*\]$/, "");

@@ -10,6 +10,14 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Fixed
+- `MultiInstance`: opening a saved account in its own window could hang forever
+  on the loading screen even with a valid token. Token injection is now robust
+  to Discord removing `window.localStorage` (falls back to a detached iframe on
+  the same origin), and if the app hasn't mounted after 15s the instance reloads
+  itself once (usually a first-boot race on a fresh session, resolved once the
+  token is already stored). Added a diagnostic log at
+  `userData/abyss-mi-debug.log` capturing load failures / render-process crashes
+  to pin down any remaining case.
 - `BetterGifLoad`: GIF **search** previews were blank. Discord replaced Tenor
   with Klipy, whose picker previews are served as video (mp4/webm); the plugin
   force-converted every result to an `<img>` and couldn't rewrite Klipy URLs,
