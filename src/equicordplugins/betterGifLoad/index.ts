@@ -59,21 +59,25 @@ export default definePlugin({
         {
             find: '"GIFPickerViewStore"',
             replacement: [
-                {
-                    match: /\?(\i\.\i\.IMAGE):\i\.\i\.VIDEO/,
-                    replace: "?$1:$1",
-                },
+                // NOTE (Abyss): on ne force PLUS le type IMAGE. Depuis que Discord
+                // a remplacé Tenor par Klipy (dont les aperçus de RECHERCHE sont
+                // servis en vidéo mp4/webm), forcer chaque résultat en <img> avec
+                // une URL que parseLink ne sait pas convertir donnait un aperçu
+                // vide. On laisse donc Discord choisir le bon type (image/vidéo)
+                // par provider, et parseLink se contente de réduire la qualité des
+                // providers qu'il connaît (Tenor/Giphy/Discord). forceImage retiré
+                // pour rester cohérent avec le type natif de l'élément.
                 {
                     match: /(GIF_PICKER_QUERY_SUCCESS.{0,200}width:(\i),height:(\i),)src:(\i\(\i\)),gifSrc:(\i\(\i\))/,
-                    replace: "$1src:$self.parseLink($4,[$2,$3],true),gifSrc:$self.parseLink($5,[$2,$3],true)",
+                    replace: "$1src:$self.parseLink($4,[$2,$3]),gifSrc:$self.parseLink($5,[$2,$3])",
                 },
                 {
                     match: /(GIF_PICKER_TRENDING_FETCH_SUCCESS.{0,400})src:(\i\(\i\.trendingGIFPreview\.src\))/,
-                    replace: "$1src:$self.parseLink($2,undefined,true)",
+                    replace: "$1src:$self.parseLink($2)",
                 },
                 {
                     match: /src:(\i\(\i\.src\))(,type:\i\.\i\.TRENDING_CATEGORY,)/,
-                    replace: "src:$self.parseLink($1,undefined,true)$2",
+                    replace: "src:$self.parseLink($1)$2",
                 },
             ]
         },

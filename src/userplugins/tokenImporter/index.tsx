@@ -108,48 +108,68 @@ async function saveAccounts(accounts: SavedAccount[]): Promise<void> {
     await DataStore.set(STORE_KEY, encrypted);
 }
 
-function switchToAccount(token: string) {
+// Écrit le token dans le localStorage de l'origine Discord, de façon FIABLE.
+// Discord SUPPRIME `window.localStorage` du renderer (anti-vol de token) : y
+// écrire directement lève une exception. Un iframe about:blank hérite de la
+// même origine mais garde un localStorage vivant — c'est le chemin sûr. Chaque
+// tentative est isolée pour qu'un échec n'abandonne pas tout le basculement.
+// Renvoie true si au moins une écriture a réussi.
+function persistToken(token: string): boolean {
+    const value = `"${token}"`;
+    let ok = false;
+
+    // Chemin principal : iframe détaché (localStorage non neutralisé).
     try {
-        const TokenStore = findByProps("getToken", "setToken");
-        const FluxDispatcher = findByProps("dispatch", "subscribe", "register");
-
-        if (TokenStore && typeof (TokenStore as any).setToken === "function") {
-            (TokenStore as any).setToken(token);
-        }
-
-        // Réinitialise l'état de connexion interne de Discord — sans ces deux
-        // dispatches, setToken seul ne suffit pas : le client garde l'ancienne
-        // session en mémoire jusqu'au prochain vrai cycle de connexion.
-        FluxDispatcher?.dispatch?.({
-            type: "CONNECTION_OPEN",
-            user: {},
-            experiments: [],
-            guilds: [],
-            relationships: [],
-            private_channels: [],
-            users: [],
-            analytics_token: "",
-            session_id: "",
-        });
-        FluxDispatcher?.dispatch?.({ type: "LOGIN_SUCCESS", token });
-
-        // Discord relit le token depuis localStorage au démarrage ; l'écrire
-        // aussi dans un iframe détaché couvre le cas où le storage du process
-        // de rendu n'est pas encore synchronisé au moment du reload.
-        window.localStorage.setItem("token", `"${token}"`);
         const iframe = document.createElement("iframe");
         iframe.style.display = "none";
         document.body.appendChild(iframe);
-        try {
-            (iframe as any).contentWindow.localStorage.token = `"${token}"`;
-        } catch { }
-        document.body.removeChild(iframe);
-
-        setTimeout(() => Native.reload(), 350);
+        const ls = (iframe as any).contentWindow?.localStorage as Storage | undefined;
+        if (ls) {
+            ls.setItem("token", value);
+            ok = true;
+        }
+        iframe.remove();
     } catch (e) {
-        console.error("[TokenImporter] switch failed:", e);
-        Native.reload();
+        console.error("[TokenImporter] persist via iframe failed:", e);
     }
+
+    // Chemin secondaire : window.localStorage direct (marche quand Discord ne
+    // l'a pas retiré). `?.` évite de lever si le getter est absent.
+    try {
+        window.localStorage?.setItem?.("token", value);
+        ok = true;
+    } catch (e) {
+        console.error("[TokenImporter] persist via window failed:", e);
+    }
+
+    return ok;
+}
+
+function switchToAccount(token: string) {
+    // La persistance d'ABORD : c'est elle qui fait vraiment le basculement (au
+    // redémarrage Discord relit le token depuis le storage). Si on ne peut pas
+    // l'écrire, recharger ne ferait que revenir sur l'ancien compte — on le dit
+    // au lieu de recharger dans le vide.
+    if (!persistToken(token)) {
+        console.error("[TokenImporter] switch aborted: token could not be persisted");
+        Toasts.show(Toasts.create("Basculement impossible : stockage verrouillé, réessaie.", Toasts.Type.FAILURE));
+        return;
+    }
+
+    // Mise à jour en mémoire (best-effort) pour un basculement perçu plus
+    // rapide ; le vrai basculement reste le reload sur le token persistté.
+    try {
+        const TokenStore = findByProps("getToken", "setToken");
+        (TokenStore as any)?.setToken?.(token);
+        const FluxDispatcher = findByProps("dispatch", "subscribe", "register");
+        FluxDispatcher?.dispatch?.({ type: "LOGIN_SUCCESS", token });
+    } catch (e) {
+        console.error("[TokenImporter] in-memory switch step failed (non fatal):", e);
+    }
+
+    // Reload court : les écritures localStorage sont synchrones, pas besoin
+    // d'attendre longtemps.
+    setTimeout(() => Native.reload(), 150);
 }
 
 // Enregistre les comptes sauvegardés dans le sélecteur multi-comptes natif de

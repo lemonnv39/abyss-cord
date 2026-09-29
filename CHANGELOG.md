@@ -9,6 +9,40 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ## [Unreleased]
 
+### Fixed
+- `BetterGifLoad`: GIF **search** previews were blank. Discord replaced Tenor
+  with Klipy, whose picker previews are served as video (mp4/webm); the plugin
+  force-converted every result to an `<img>` and couldn't rewrite Klipy URLs,
+  so the image never loaded. It no longer forces the image type — Discord picks
+  the right element per provider — while still down-scaling the providers it
+  knows (Tenor/Giphy/Discord). Favorites were a separate patch and were fine.
+- `ImageToolkit`: some avatars/banners weren't clickable. Detection only matched
+  `HTMLImageElement` with a `/avatars/` URL, missing avatars drawn as SVG
+  `<image>` (the status-ring variant), per-server (guild member) avatars/banners,
+  and `media.discordapp.net`-proxied URLs. It now reads `<img>`, SVG `<image>`
+  and CSS background images, matches both CDN paths, and hit-tests the cursor so
+  overlays don't block the click and empty space never grabs a nearby image.
+- `TokenImporter`: switching account ("Basculer") sometimes silently reverted to
+  the old account. Discord removes `window.localStorage` to block token
+  grabbers, so writing the token there threw and aborted the switch **before**
+  it was persisted, then reloaded onto the old token. Persistence is now done
+  first via a detached iframe (the reliable path), each write is isolated, and
+  the reload only happens once the token is actually stored — otherwise it warns
+  instead of reloading into nothing.
+- `DMProof`: group DMs (and any conversation without a user avatar) stayed
+  unblurred, because the blur only targeted rows containing an
+  `img[src*="/avatars/"]`. Groups use `/channel-icons/` or a generated icon. The
+  blur now covers any conversation row (one carrying an image or an avatar
+  wrapper) while still leaving the Friends/Shop/Nitro nav links alone.
+
+### Changed
+- Signed the build as **Abyss**: the banner stamped atop every compiled file now
+  identifies `abyss-cord` instead of Equicord, and the settings **Backup &
+  Restore** export is named `abyss-<type>-backup-<date>.json` (was
+  `equicord-…`). Load-bearing internals (the `Vencord`/`VencordNative` bridge,
+  the `vencord:`/`equicord:` protocols) and the Vencord/Equicord plugins are
+  intentionally left untouched — renaming them would break injection/IPC/CSP.
+
 ### Added
 - `TokenImporter`: an "Exporter en .txt" button in the saved-accounts
   toolbar. Writes one `.txt` per folder (named after the folder, plus one

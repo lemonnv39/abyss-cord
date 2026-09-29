@@ -4,15 +4,24 @@
    row — matching on it alone left every other conversation unblurred.
    "channel_" is common to every row (selected or not), but it's ALSO used
    by the Amis/Boutique/Nitro/Quêtes nav links above "Messages privés",
-   which live in the same "privateChannels_" container. Those nav rows
-   render an SVG icon, not a user avatar <img>, so scope the blur to rows
-   that actually contain an avatar image — real conversations only. */
-.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img[src*="/avatars/"]) {
+   which live in the same "privateChannels_" container.
+
+   Scoping to `img[src*="/avatars/"]` used to leave GROUP DMs unblurred:
+   groups have no user avatar — their icon comes from /channel-icons/ (custom)
+   or a generated default icon, so they slipped through. The reliable line
+   between a real conversation and a nav link is that conversations render an
+   avatar/icon (an <img> or an "avatar_" wrapper) while the nav rows render a
+   plain SVG glyph. So blur any row that carries an image or an avatar wrapper,
+   which covers user DMs AND groups without catching the nav links. */
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img),
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has([class*="avatar"]) {
     filter: blur(6px);
     transition: filter 0.15s ease-in-out;
 }
 
-.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img[src*="/avatars/"]):hover,
-.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img[src*="/avatars/"]):focus-within {
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img):hover,
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has(img):focus-within,
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has([class*="avatar"]):hover,
+.dm-proof-enabled [class*="privateChannels_"] [class*="channel_"]:has([class*="avatar"]):focus-within {
     filter: none;
 }

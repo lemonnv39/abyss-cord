@@ -52,7 +52,9 @@ export const gitHash = process.env.EQUICORD_HASH || execSync("git rev-parse HEAD
 
 export const banner = {
     js: `
-// Equicord ${gitHash}
+// Abyss (abyss-cord) — Discord client mod, fork d'Equicord/Vencord
+// https://github.com/lemonnv39/abyss-cord
+// Build: ${gitHash}
 // Standalone: ${IS_STANDALONE}
 // Platform: ${IS_STANDALONE === false ? process.platform : "Universal"}
 // Updater Disabled: ${IS_UPDATER_DISABLED}

@@ -33,8 +33,11 @@ import { openImageModal } from "@utils/discord";
 import definePlugin from "@utils/types";
 import { ContextMenuApi, Menu, React, Toasts } from "@webpack/common";
 
-const AVATAR_URL_RE = /cdn\.discordapp\.com\/(avatars|guilds\/\d+\/users\/\d+\/avatars|embed\/avatars)\//;
-const BANNER_URL_RE = /cdn\.discordapp\.com\/banners\//;
+// Both CDN and the media proxy serve these, and per-server (guild member)
+// avatars/banners live under a different path than global ones. Missing either
+// is why "some avatars/banners were clickable and others weren't".
+const AVATAR_URL_RE = /(?:cdn\.discordapp\.com|media\.discordapp\.net)\/(?:avatars|guilds\/\d+\/users\/\d+\/avatars|embed\/avatars)\//;
+const BANNER_URL_RE = /(?:cdn\.discordapp\.com|media\.discordapp\.net)\/(?:banners|guilds\/\d+\/users\/\d+\/banners)\//;
 
 // Below this, treat it as a list/message avatar — those should keep opening
 // Discord's own profile popout, not our image modal.
@@ -73,40 +76,54 @@ function highResUrl(rawUrl: string, size = 1024): string {
 
 // ── Find what was actually clicked ──────────────────────────────────────────
 
-function findAvatarImg(target: EventTarget | null): HTMLImageElement | null {
-    let el = target as HTMLElement | null;
-    for (let depth = 0; el && depth < 5; depth++, el = el.parentElement) {
-        if (
-            el instanceof HTMLImageElement &&
-            AVATAR_URL_RE.test(el.currentSrc || el.src) &&
-            el.clientWidth >= MIN_AVATAR_SIZE && el.clientHeight >= MIN_AVATAR_SIZE
-        ) {
-            return el;
-        }
+type Hit = { url: string; isBanner: boolean; };
+
+// Read an image URL from any node shape Discord uses for avatars/banners:
+// a plain <img>, an SVG <image> (avatars with a status ring are drawn as SVG,
+// which is NOT an HTMLImageElement — the old code missed all of these), or a
+// CSS background-image (banners are often a background div).
+function urlFromElement(el: Element): string | null {
+    if (el instanceof HTMLImageElement) return el.currentSrc || el.src || null;
+    if (typeof SVGImageElement !== "undefined" && el instanceof SVGImageElement) {
+        return el.href?.baseVal || el.getAttribute("href") || el.getAttribute("xlink:href") || null;
     }
+    const bg = getComputedStyle(el).backgroundImage;
+    const m = bg && bg.match(/url\(["']?(https?:[^"')]+)["']?\)/);
+    return m ? m[1] : null;
+}
+
+function classify(url: string): "avatar" | "banner" | null {
+    if (AVATAR_URL_RE.test(url)) return "avatar";
+    if (BANNER_URL_RE.test(url)) return "banner";
     return null;
 }
 
-function findBannerUrl(target: EventTarget | null): string | null {
+function pointIn(r: DOMRect, x: number, y: number): boolean {
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+// Walk up from the clicked node; at each level inspect the element itself and
+// its <img>/<image> descendants. Hit-test against the cursor so an overlay
+// (status ring, hover layer) sitting on top of the real avatar/banner doesn't
+// stop us, and so clicking empty card space never grabs a nearby image.
+function findMedia(target: EventTarget | null, x: number, y: number): Hit | null {
     let el = target as HTMLElement | null;
     for (let depth = 0; el && depth < 6; depth++, el = el.parentElement) {
-        if (el.clientWidth < MIN_BANNER_WIDTH) continue;
-
-        if (el instanceof HTMLImageElement && BANNER_URL_RE.test(el.currentSrc || el.src)) {
-            return el.currentSrc || el.src;
+        const candidates: Element[] = [el];
+        if (el.querySelectorAll) candidates.push(...el.querySelectorAll("img, image"));
+        for (const c of candidates) {
+            const url = urlFromElement(c);
+            if (!url) continue;
+            const kind = classify(url);
+            if (!kind) continue;
+            const r = c.getBoundingClientRect();
+            if (!pointIn(r, x, y)) continue;
+            if (kind === "avatar" && (r.width < MIN_AVATAR_SIZE || r.height < MIN_AVATAR_SIZE)) continue;
+            if (kind === "banner" && r.width < MIN_BANNER_WIDTH) continue;
+            return { url, isBanner: kind === "banner" };
         }
-
-        const bg = getComputedStyle(el).backgroundImage;
-        const m = bg && bg.match(/url\(["']?(https:[^"')]+)["']?\)/);
-        if (m && BANNER_URL_RE.test(m[1])) return m[1];
     }
     return null;
-}
-
-function findImageUrl(target: EventTarget | null): string | null {
-    const avatar = findAvatarImg(target);
-    if (avatar) return avatar.currentSrc || avatar.src;
-    return findBannerUrl(target);
 }
 
 // ── Enlarge ──────────────────────────────────────────────────────────────────
@@ -222,22 +239,20 @@ function ImageToolkitMenu({ url }: { url: string; }) {
 // ── Event delegation ─────────────────────────────────────────────────────────
 
 function onClick(e: MouseEvent) {
-    const avatar = findAvatarImg(e.target);
-    const bannerUrl = avatar ? null : findBannerUrl(e.target);
-    const url = avatar ? (avatar.currentSrc || avatar.src) : bannerUrl;
-    if (!url) return;
+    const hit = findMedia(e.target, e.clientX, e.clientY);
+    if (!hit) return;
 
     e.preventDefault();
     e.stopPropagation();
-    openEnlarged(url, !avatar);
+    openEnlarged(hit.url, hit.isBanner);
 }
 
 function onContextMenu(e: MouseEvent) {
-    const url = findImageUrl(e.target);
-    if (!url) return;
+    const hit = findMedia(e.target, e.clientX, e.clientY);
+    if (!hit) return;
 
     e.preventDefault();
-    ContextMenuApi.openContextMenu(e as any, () => <ImageToolkitMenu url={url} />);
+    ContextMenuApi.openContextMenu(e as any, () => <ImageToolkitMenu url={hit.url} />);
 }
 
 export default definePlugin({
