@@ -9,6 +9,9 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ## [Unreleased]
 
+### Changed
+- `AbyssBadges`: the badge now sits **last** in the profile badge row (was first).
+
 ### Fixed
 - `AbyssBadges`: no badge showed up. The plugin fetched the list from the
   **private** delivery repo (`0ctane6/abyss`), and `raw.githubusercontent.com`

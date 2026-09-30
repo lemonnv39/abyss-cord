@@ -38,7 +38,7 @@ const badge: ProfileBadge = {
     id: "abyss-user",
     description: "Utilisateur Abyss",
     iconSrc: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjOGI1Y2Y2Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDMyMmE4Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjIyIiBoZWlnaHQ9IjIyIiByeD0iNyIgZmlsbD0idXJsKCNnKSIvPjxwYXRoIGQ9Ik0xMiA1LjJsNS4yIDEzLjZoLTIuNTVsLTEuMDItMi44NmgtMy4yNkw5LjM1IDE4LjhINi44TDEyIDUuMnptMCA0LjVsLTEuMTIgMy4wNmgyLjI0TDEyIDkuN3oiIGZpbGw9IiNmZmYiLz48L3N2Zz4=",
-    position: BadgePosition.START,
+    position: BadgePosition.END,
     link: "https://skinwalker.dev",
     shouldShow: ({ userId }) => abyssUsers.has(userId),
 };
