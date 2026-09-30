@@ -198,12 +198,23 @@ function createTokenPreload(token: string): string {
         }
     } catch { }
 
-    // Même logique d'injection robuste (avec repli iframe) que la réinjection.
+    // Valeur stockée par Discord = le token entre guillemets (chaîne JSON).
+    const cleanTok = String(token || "").trim().replace(/^"+|"+$/g, "");
+    const qLiteral = JSON.stringify(`"${cleanTok}"`); // ex: "\"tok\""
+    // Réinjection main-world (au cas où) : même logique + redirection depuis /login.
     const innerLiteral = JSON.stringify(tokenInjectSource(token));
 
+    // CLÉ DU FIX : l'écriture DOIT être SYNCHRONE et au document-start. L'ancienne
+    // version passait par webFrame.executeJavaScript (asynchrone) : Discord lisait
+    // (puis neutralisait) localStorage AVANT que le token n'y soit écrit → aucune
+    // session → écran /login (constaté dans abyss-mi-debug.log). On écrit donc le
+    // token directement, synchronement, dans le préload, avant le bundle Discord.
     const script = [
-        "// Abyss MultiInstance - token preload",
+        "// Abyss MultiInstance - token preload (synchronous, pre-bundle)",
         "(function() {",
+        "  var Q = " + qLiteral + ";",
+        "  try { localStorage.setItem('token', Q); localStorage.setItem('default_token', Q); } catch(e) {}",
+        "  try { if (window && window.localStorage) { window.localStorage.setItem('token', Q); window.localStorage.setItem('default_token', Q); } } catch(e) {}",
         "  try {",
         "    var wf = null;",
         "    try { wf = require('electron').webFrame; } catch(e) {}",
@@ -342,6 +353,8 @@ export async function openInstanceWindow(
         });
 
         const wc = win.webContents;
+        const targetDomain = VALID_DOMAINS.has(domain) ? domain : "discord.com";
+        const homeUrl = `https://${targetDomain}/channels/@me`;
 
         // Redundant injection: the preload sets the token before Discord even
         // starts, but we repeat it on every (re)navigation just in case (e.g.
@@ -372,12 +385,15 @@ export async function openInstanceWindow(
                 const st = typeof raw === "string" && raw[0] === "{" ? JSON.parse(raw) : null;
                 if (!recovered && (!st || !st.hasChat)) {
                     recovered = true;
-                    miLog("watchdog reload-once", userId);
-                    if (!win.isDestroyed()) wc.reload();
+                    miLog("watchdog renav-once", userId);
+                    // Re-navigate to /channels/@me (NOT reload — a reload would
+                    // just reload /login). The preload re-runs and writes the
+                    // token synchronously before this fresh load.
+                    if (!win.isDestroyed()) wc.loadURL(homeUrl).catch(() => { });
                 }
             } catch (e) {
                 miLog("watchdog probe failed", userId, String(e));
-                if (!recovered && !win.isDestroyed()) { recovered = true; miLog("watchdog reload after probe fail", userId); try { wc.reload(); } catch { } }
+                if (!recovered && !win.isDestroyed()) { recovered = true; miLog("watchdog renav after probe fail", userId); wc.loadURL(homeUrl).catch(() => { }); }
             }
         }, 15000);
 
@@ -398,8 +414,7 @@ export async function openInstanceWindow(
             return { action: "deny" };
         });
 
-        const targetDomain = VALID_DOMAINS.has(domain) ? domain : "discord.com";
-        await win.loadURL(`https://${targetDomain}/channels/@me`);
+        await win.loadURL(homeUrl);
         return { ok: true };
     } catch (e: any) {
         return { ok: false, error: e?.message ?? String(e) };

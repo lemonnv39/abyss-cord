@@ -10,14 +10,15 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Fixed
-- `MultiInstance`: opening a saved account in its own window could hang forever
-  on the loading screen even with a valid token. Token injection is now robust
-  to Discord removing `window.localStorage` (falls back to a detached iframe on
-  the same origin), and if the app hasn't mounted after 15s the instance reloads
-  itself once (usually a first-boot race on a fresh session, resolved once the
-  token is already stored). Added a diagnostic log at
-  `userData/abyss-mi-debug.log` capturing load failures / render-process crashes
-  to pin down any remaining case.
+- `MultiInstance`: opening a saved account in its own window hung on the loading
+  screen and dropped to `/login`, even with a valid token. The diagnostic log
+  (`userData/abyss-mi-debug.log`) pinned it down: the token was written via an
+  **asynchronous** `webFrame.executeJavaScript`, which ran a tick too late —
+  Discord read (and cleared) `localStorage` before the token landed, so the
+  session had no token → login screen. The preload now writes the token
+  **synchronously at document-start**, before Discord's bundle runs, and the 15s
+  recovery **re-navigates** to `/channels/@me` (instead of reloading `/login`) so
+  the preload re-runs on a fresh load. The diagnostic log is kept.
 - `BetterGifLoad`: GIF **search** previews were blank. Discord replaced Tenor
   with Klipy, whose picker previews are served as video (mp4/webm); the plugin
   force-converted every result to an `<img>` and couldn't rewrite Klipy URLs,
@@ -30,6 +31,12 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   and `media.discordapp.net`-proxied URLs. It now reads `<img>`, SVG `<image>`
   and CSS background images, matches both CDN paths, and hit-tests the cursor so
   overlays don't block the click and empty space never grabs a nearby image.
+  Follow-up: the broadened detection was catching the **server header banner**,
+  so clicking the server name only showed the banner and the server menu
+  (Boost/Invite/Settings) became unreachable. Banners that are (or sit inside) a
+  clickable control — a `<button>`/`role=button`/`aria-haspopup` element — now
+  keep their own click, so server settings open normally while profile-card
+  banners stay enlargeable.
 - `TokenImporter`: switching account ("Basculer") sometimes silently reverted to
   the old account. Discord removes `window.localStorage` to block token
   grabbers, so writing the token there threw and aborted the switch **before**

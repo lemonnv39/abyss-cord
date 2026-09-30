@@ -102,6 +102,24 @@ function pointIn(r: DOMRect, x: number, y: number): boolean {
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 }
 
+// True if the element (or a close ancestor) is itself a clickable control that
+// owns the click — a <button>/<a>, a role=button/menuitem, or something with an
+// aria-haspopup menu. The guild/server header draws the server banner as its
+// background but IS the button that opens the server menu (Boost/Invite/Settings);
+// without this guard we'd swallow that click and only show the banner, making
+// "server settings" unreachable. Used for banners only (avatars are static).
+function inActivationTarget(el: Element | null): boolean {
+    for (let depth = 0; el && depth < 6; depth++, el = el.parentElement) {
+        const tag = el.tagName;
+        if (tag === "BUTTON" || tag === "A") return true;
+        const role = el.getAttribute("role");
+        if (role === "button" || role === "menuitem" || role === "tab") return true;
+        const pop = el.getAttribute("aria-haspopup");
+        if (pop && pop !== "false") return true;
+    }
+    return false;
+}
+
 // Walk up from the clicked node; at each level inspect the element itself and
 // its <img>/<image> descendants. Hit-test against the cursor so an overlay
 // (status ring, hover layer) sitting on top of the real avatar/banner doesn't
@@ -120,6 +138,9 @@ function findMedia(target: EventTarget | null, x: number, y: number): Hit | null
             if (!pointIn(r, x, y)) continue;
             if (kind === "avatar" && (r.width < MIN_AVATAR_SIZE || r.height < MIN_AVATAR_SIZE)) continue;
             if (kind === "banner" && r.width < MIN_BANNER_WIDTH) continue;
+            // A banner that IS (or sits inside) a clickable control — the server
+            // header that opens the server menu — must keep its own click.
+            if (kind === "banner" && inActivationTarget(c)) continue;
             return { url, isBanner: kind === "banner" };
         }
     }
