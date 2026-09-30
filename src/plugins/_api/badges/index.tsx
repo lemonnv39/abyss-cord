@@ -154,13 +154,8 @@ export default definePlugin({
         {
             find: "getLegacyUsername(){",
             replacement: {
-                // Abyss : on AJOUTE les badges de mod APRÈS les badges natifs de
-                // Discord (au lieu de les préfixer), pour que le badge Abyss (en
-                // position END) s'affiche en tout dernier. On capture le tableau
-                // natif renvoyé et on `.concat()` dessus — équilibré niveau
-                // parenthèses, et ça gère le tableau vide (`[].concat(...)`).
-                match: /(getBadges\(\)\{.{0,100}?return)(\[.*?\])(?=[,;}])/,
-                replace: "$1$2.concat($self.getBadges(this))"
+                match: /getBadges\(\)\{.{0,100}?return\[/,
+                replace: "$&...$self.getBadges(this),"
             }
         }
     ],
