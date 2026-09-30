@@ -20,7 +20,11 @@ import { BadgePosition, ProfileBadge } from "@api/Badges";
 import { DataStore } from "@api/index";
 import definePlugin from "@utils/types";
 
-const BADGES_URL = "https://raw.githubusercontent.com/0ctane6/abyss/master/badges.json";
+// IMPORTANT : doit pointer sur un repo PUBLIC — raw.githubusercontent.com ne sert
+// pas les repos privés (le repo de livraison `0ctane6/abyss` est privé → 404).
+// `lemonnv39/abyss-cord` est public et reçoit chaque push, donc éditer badges.json
+// là-bas + push = liste à jour au runtime, sans rebuild.
+const BADGES_URL = "https://raw.githubusercontent.com/lemonnv39/abyss-cord/main/badges.json";
 const CACHE_KEY = "abyssBadges-cache";
 const REFRESH_MS = 1000 * 60 * 30; // 30 min
 

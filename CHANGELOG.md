@@ -10,6 +10,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 ## [Unreleased]
 
 ### Fixed
+- `AbyssBadges`: no badge showed up. The plugin fetched the list from the
+  **private** delivery repo (`0ctane6/abyss`), and `raw.githubusercontent.com`
+  returns 404 for private repos, so the list never loaded. It now fetches from
+  the **public** `lemonnv39/abyss-cord` (main), which serves `badges.json` over
+  raw — badges appear, and editing that file still needs no rebuild.
 - `MultiInstance`: opening a saved account in its own window hung on the loading
   screen and dropped to `/login`, even with a valid token. The diagnostic log
   (`userData/abyss-mi-debug.log`) pinned it down: the token was written via an
