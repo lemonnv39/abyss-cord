@@ -11,6 +11,9 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ### Changed
 - `AbyssBadges`: the badge now sits **last** in the profile badge row (was first).
+- Badge API: custom/mod badges are now appended **after** Discord's own native
+  badges (Nitro, HypeSquad…) instead of before them, so the Abyss badge (position
+  END) shows as the very last badge. Affects all mod badges' placement.
 
 ### Fixed
 - `AbyssBadges`: no badge showed up. The plugin fetched the list from the
