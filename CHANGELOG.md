@@ -33,10 +33,12 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   overlays don't block the click and empty space never grabs a nearby image.
   Follow-up: the broadened detection was catching the **server header banner**,
   so clicking the server name only showed the banner and the server menu
-  (Boost/Invite/Settings) became unreachable. Banners that are (or sit inside) a
-  clickable control — a `<button>`/`role=button`/`aria-haspopup` element — now
-  keep their own click, so server settings open normally while profile-card
-  banners stay enlargeable.
+  (Boost/Invite/Settings) became unreachable. Banner-enlarge is now limited to
+  **profile cards only**: banners in the app chrome — the server header / left
+  channel sidebar (a `<header>`/`<nav>` or `*sidebar*`/`*guildHeader*`
+  container), or any element that is itself a clickable control — keep their own
+  click, so server settings open normally while profile-card banners (which live
+  in overlay popouts) stay enlargeable.
 - `TokenImporter`: switching account ("Basculer") sometimes silently reverted to
   the old account. Discord removes `window.localStorage` to block token
   grabbers, so writing the token there threw and aborted the switch **before**

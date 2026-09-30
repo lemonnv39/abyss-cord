@@ -138,9 +138,13 @@ function findMedia(target: EventTarget | null, x: number, y: number): Hit | null
             if (!pointIn(r, x, y)) continue;
             if (kind === "avatar" && (r.width < MIN_AVATAR_SIZE || r.height < MIN_AVATAR_SIZE)) continue;
             if (kind === "banner" && r.width < MIN_BANNER_WIDTH) continue;
-            // A banner that IS (or sits inside) a clickable control — the server
-            // header that opens the server menu — must keep its own click.
-            if (kind === "banner" && inActivationTarget(c)) continue;
+            // Only PROFILE-card banners should enlarge. A banner in the app chrome
+            // — the server header / left channel sidebar (a <header>/<nav> or a
+            // *sidebar*/*guildHeader* container), which opens the server menu —
+            // must keep its own click, as must a banner that is itself a clickable
+            // control. Profile popouts live in overlay layers, never inside these,
+            // so they still enlarge.
+            if (kind === "banner" && (inActivationTarget(c) || c.closest('header, nav, [class*="sidebar" i], [class*="guildHeader" i]'))) continue;
             return { url, isBanner: kind === "banner" };
         }
     }
