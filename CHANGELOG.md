@@ -61,6 +61,15 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   intentionally left untouched — renaming them would break injection/IPC/CSP.
 
 ### Added
+- `AbyssBadges` plugin: a custom **"Utilisateur Abyss"** profile badge, shown to
+  every Abyss client on the profiles of a curated list of members (like
+  Vencord's badges). The list, badge image and tooltip live in a single
+  `badges.json` at the repo root, fetched at runtime from
+  `raw.githubusercontent.com/0ctane6/abyss/master/badges.json` — so adding or
+  removing an ID is just an edit + push, no dist rebuild. The last list is cached
+  (DataStore) so badges show instantly and offline. **Required** (always on,
+  users can't disable it — the toggle is locked). No CSP change needed (raw
+  GitHub + a data-URI default image are already allowed).
 - `TokenImporter`: an "Exporter en .txt" button in the saved-accounts
   toolbar. Writes one `.txt` per folder (named after the folder, plus one
   for unsorted accounts) into a directory you pick via the native folder
