@@ -154,8 +154,15 @@ export default definePlugin({
         {
             find: "getLegacyUsername(){",
             replacement: {
-                match: /getBadges\(\)\{.{0,100}?return\[/,
-                replace: "$&...$self.getBadges(this),"
+                // Abyss : insère les badges de mod À LA FIN du tableau natif de
+                // Discord (avant le `]` de clôture), pour qu'ils s'affichent APRÈS
+                // les badges natifs. Le vrai code est :
+                //   getBadges(){return[...this._userProfile.badges??[],
+                //     ...this._guildMemberProfile?.badges??[]]}getLegacyUsername(){
+                // donc on ancre sur `]}getLegacyUsername` (getBadges est collé à
+                // getLegacyUsername) et on injecte juste avant ce `]`.
+                match: /(getBadges\(\)\{.{0,100}?return\[.*?)(\]\}getLegacyUsername)/,
+                replace: "$1,...$self.getBadges(this)$2"
             }
         }
     ],

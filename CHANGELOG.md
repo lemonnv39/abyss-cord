@@ -11,11 +11,11 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
 
 ### Changed
 - `AbyssBadges`: the badge sits **last among mod badges** (position END).
-
-### Reverted
-- Badge API: the attempt to append mod badges **after** Discord's native badges
-  (1.2.3) was reverted — the runtime regex didn't match this Discord build, so no
-  badge injected at all. Back to the working prepend (mod badges before native).
+- Badge API: mod badges are injected **after** Discord's native badges (at the end
+  of `getBadges()`'s array, anchored on the real `]}getLegacyUsername` structure)
+  instead of before them, so the Abyss badge shows as the very last badge. (1.2.3
+  attempted this with a wrong regex and broke injection; 1.2.4 reverted; 1.2.5 uses
+  the exact live structure.)
 
 ### Fixed
 - `AbyssBadges`: no badge showed up. The plugin fetched the list from the
