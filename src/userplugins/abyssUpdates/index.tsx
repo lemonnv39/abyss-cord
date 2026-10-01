@@ -20,15 +20,16 @@
  */
 
 import { get, set } from "@api/DataStore";
+import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
-import { Modal, openModal, React, Text } from "@webpack/common";
+import { Button, Forms, React } from "@webpack/common";
 import Plugins from "~plugins";
 
 const DATA_KEY = "AbyssUpdates_knownPlugins";
 
 // Plugins introduits dans la build courante — affichés dès la 1re MAJ même sans
 // historique local. À mettre à jour quand on ajoute un plugin notable.
-const JUST_ADDED = ["AbyssUpdateTest"];
+const JUST_ADDED = ["AbyssHelloWorld", "AbyssUpdateTest"];
 
 // Ne jamais s'annoncer soi-même dans la liste des nouveautés.
 const HIDDEN = new Set(["AbyssUpdates"]);
@@ -50,61 +51,66 @@ function describe(name: string): string {
     return p?.description ?? "";
 }
 
-function NewPluginsList({ items }: { items: NewPlugin[]; }) {
+function UpdatesModal({ rootProps, items }: { rootProps: any; items: NewPlugin[]; }) {
+    const n = items.length;
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" }}>
-            {items.map(p => (
-                <div
-                    key={p.name}
-                    style={{
-                        padding: "10px 12px",
-                        borderRadius: "8px",
-                        background: "var(--background-secondary-alt, var(--background-secondary))",
-                        border: "1px solid var(--background-modifier-accent)",
-                    }}
-                >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontWeight: 600, color: "var(--header-primary)" }}>{p.name}</span>
-                        <span
+        <ModalRoot {...rootProps} size="small">
+            <ModalHeader separator={false}>
+                <Forms.FormTitle tag="h4" style={{ margin: 0, color: "#ffffff" }}>
+                    Abyss — Mise à jour appliquée
+                </Forms.FormTitle>
+                <ModalCloseButton onClick={rootProps.onClose} />
+            </ModalHeader>
+
+            <ModalContent>
+                <Forms.FormText style={{ marginBottom: "12px", color: "var(--text-muted)" }}>
+                    {n} nouveau{n > 1 ? "x" : ""} plugin{n > 1 ? "s" : ""} ajouté{n > 1 ? "s" : ""} à Abyss :
+                </Forms.FormText>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingBottom: "8px" }}>
+                    {items.map(p => (
+                        <div
+                            key={p.name}
                             style={{
-                                fontSize: "10px",
-                                fontWeight: 700,
-                                letterSpacing: "0.03em",
-                                padding: "1px 6px",
-                                borderRadius: "999px",
-                                color: "var(--white-500, #fff)",
-                                background: "var(--brand-500, #5865f2)",
+                                padding: "10px 12px",
+                                borderRadius: "8px",
+                                background: "var(--background-secondary-alt, var(--background-secondary))",
+                                border: "1px solid var(--background-modifier-accent)",
                             }}
-                        >NOUVEAU</span>
-                    </div>
-                    {p.description && (
-                        <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "3px", lineHeight: 1.4 }}>
-                            {p.description}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontWeight: 600, color: "var(--header-primary)" }}>{p.name}</span>
+                                <span
+                                    style={{
+                                        fontSize: "10px",
+                                        fontWeight: 700,
+                                        letterSpacing: "0.03em",
+                                        padding: "1px 6px",
+                                        borderRadius: "999px",
+                                        color: "#ffffff",
+                                        background: "var(--brand-500, #5865f2)",
+                                    }}
+                                >NOUVEAU</span>
+                            </div>
+                            {p.description && (
+                                <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "3px", lineHeight: 1.4 }}>
+                                    {p.description}
+                                </div>
+                            )}
                         </div>
-                    )}
+                    ))}
                 </div>
-            ))}
-        </div>
+            </ModalContent>
+
+            <ModalFooter>
+                <Button onClick={rootProps.onClose}>Génial !</Button>
+            </ModalFooter>
+        </ModalRoot>
     );
 }
 
 function showUpdateModal(items: NewPlugin[]) {
-    const n = items.length;
-    openModal(props => (
-        <Modal
-            {...props}
-            title="Abyss — Mise à jour appliquée"
-            subtitle={`${n} nouveau${n > 1 ? "x" : ""} plugin${n > 1 ? "s" : ""} ajouté${n > 1 ? "s" : ""} à Abyss`}
-            actions={[
-                { text: "Génial !", variant: "primary", onClick: props.onClose },
-            ]}
-        >
-            <Text variant="text-sm/normal" style={{ color: "var(--text-muted)" }}>
-                Voici ce qui vient d'être ajouté :
-            </Text>
-            <NewPluginsList items={items} />
-        </Modal>
-    ));
+    openModal(props => <UpdatesModal rootProps={props} items={items} />);
 }
 
 export default definePlugin({
