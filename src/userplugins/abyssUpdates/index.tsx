@@ -25,14 +25,24 @@ import definePlugin from "@utils/types";
 import { React } from "@webpack/common";
 import Plugins from "~plugins";
 
-const DATA_KEY = "AbyssUpdates_knownPlugins";
+const STATE_KEY = "AbyssUpdates_state";
 
-// Plugins introduits dans la build courante — affichés dès la 1re MAJ même sans
-// historique local. À mettre à jour quand on ajoute un plugin notable.
+// Bumpe ce numéro pour RÉ-ANNONCER JUST_ADDED à tout le monde au prochain
+// lancement (utile pour mettre en avant un lot de nouveautés même chez ceux qui
+// ont déjà l'historique). Sans bump, la détection reste purement automatique.
+const ANNOUNCE_VERSION = 1;
+
+// Plugins mis en avant pour l'annonce courante (affichés tant que ANNOUNCE_VERSION
+// n'a pas encore été vu). À vider quand on ne veut plus d'annonce forcée.
 const JUST_ADDED = ["AbyssHelloWorld", "AbyssUpdateTest"];
 
 // Ne jamais s'annoncer soi-même dans la liste des nouveautés.
 const HIDDEN = new Set(["AbyssUpdates"]);
+
+interface StoredState {
+    version: number;
+    known: string[];
+}
 
 interface NewPlugin {
     name: string;
@@ -222,25 +232,32 @@ export default definePlugin({
     async start() {
         const current = allPluginNames();
 
-        let known: string[] | undefined;
+        let state: StoredState | undefined;
         try {
-            known = await get<string[]>(DATA_KEY);
+            state = await get<StoredState>(STATE_KEY);
         } catch {
-            known = undefined;
+            state = undefined;
         }
 
-        // Premier lancement : on simule un historique = tout sauf les plugins
-        // tout juste ajoutés, afin que la pop-up apparaisse dès la 1re MAJ.
-        if (!known) {
-            known = current.filter(n => !JUST_ADDED.includes(n));
+        const isAnnounce = !state || state.version < ANNOUNCE_VERSION;
+
+        let added: string[];
+        if (isAnnounce) {
+            // 1re fois OU nouvelle annonce : met en avant JUST_ADDED (encore
+            // présents) + tout ce qui est apparu depuis l'historique connu.
+            const prev = new Set(state?.known ?? []);
+            const fromAnnounce = JUST_ADDED.filter(n => current.includes(n));
+            const fromDiff = state?.known ? current.filter(n => !prev.has(n)) : [];
+            added = [...new Set([...fromAnnounce, ...fromDiff])].filter(n => !HIDDEN.has(n));
+        } else {
+            // Fonctionnement normal : diff par rapport au dernier lancement.
+            const prev = new Set(state!.known);
+            added = current.filter(n => !prev.has(n) && !HIDDEN.has(n));
         }
 
-        const knownSet = new Set(known);
-        const added = current.filter(n => !knownSet.has(n) && !HIDDEN.has(n));
-
-        // Mémorise l'état courant pour la prochaine comparaison.
+        // Mémorise l'état courant (+ version d'annonce vue) pour la prochaine fois.
         try {
-            await set(DATA_KEY, current);
+            await set(STATE_KEY, { version: ANNOUNCE_VERSION, known: current } satisfies StoredState);
         } catch {
             // best-effort
         }
