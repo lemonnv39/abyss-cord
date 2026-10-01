@@ -21,9 +21,10 @@
 
 import "./styles.css";
 
+import { get, set } from "@api/DataStore";
 import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
-import { Forms, React, showToast, Toasts } from "@webpack/common";
+import { Forms, React } from "@webpack/common";
 import Plugins from "~plugins";
 
 const STATE_KEY = "AbyssUpdates_state";
@@ -34,8 +35,8 @@ const STATE_KEY = "AbyssUpdates_state";
 const ANNOUNCE_VERSION = 2;
 
 // Plugins mis en avant pour l'annonce courante (affichés tant que ANNOUNCE_VERSION
-// n'a pas encore été vu). À vider quand on ne veut plus d'annonce forcée.
-const JUST_ADDED = ["AbyssHelloWorld", "AbyssUpdateTest"];
+// n'a pas encore été vu). Vide = pas d'annonce forcée, pure détection auto.
+const JUST_ADDED: string[] = [];
 
 // Ne jamais s'annoncer soi-même dans la liste des nouveautés.
 const HIDDEN = new Set(["AbyssUpdates"]);
@@ -122,31 +123,48 @@ export default definePlugin({
     description: "Affiche une pop-up « Quoi de neuf » listant les nouveaux plugins après chaque mise à jour d'Abyss.",
     authors: [{ name: "0ctane", id: 0n }],
 
-    start() {
-        // ⚠️ BUILD DIAGNOSTIC : on force l'affichage de la pop-up à CHAQUE
-        // démarrage (sans gate de version ni DataStore) pour isoler si le
-        // problème vient de la modale elle-même ou de la logique de détection.
-        // Un toast confirme que start() s'exécute. À restaurer une fois validé.
+    async start() {
         const current = allPluginNames();
-        const items: NewPlugin[] = JUST_ADDED
-            .filter(n => current.includes(n) && !HIDDEN.has(n))
-            .map(name => ({ name, description: describe(name) }));
 
+        let state: StoredState | undefined;
         try {
-            showToast("[AbyssUpdates] démarré — pop-up dans 4 s…", Toasts.Type.MESSAGE);
-        } catch { /* ignore */ }
+            state = await get<StoredState>(STATE_KEY);
+        } catch {
+            state = undefined;
+        }
 
+        const isAnnounce = !state || state.version < ANNOUNCE_VERSION;
+
+        let added: string[];
+        if (isAnnounce) {
+            // 1re fois OU nouvelle annonce : met en avant JUST_ADDED (encore
+            // présents) + tout ce qui est apparu depuis l'historique connu.
+            const prev = new Set(state?.known ?? []);
+            const fromAnnounce = JUST_ADDED.filter(n => current.includes(n));
+            const fromDiff = state?.known ? current.filter(n => !prev.has(n)) : [];
+            added = [...new Set([...fromAnnounce, ...fromDiff])].filter(n => !HIDDEN.has(n));
+        } else {
+            // Fonctionnement normal : diff par rapport au dernier lancement.
+            const prev = new Set(state!.known);
+            added = current.filter(n => !prev.has(n) && !HIDDEN.has(n));
+        }
+
+        // Mémorise l'état courant (+ version d'annonce vue) pour la prochaine fois.
+        try {
+            await set(STATE_KEY, { version: ANNOUNCE_VERSION, known: current } satisfies StoredState);
+        } catch {
+            // best-effort
+        }
+
+        if (added.length === 0) return;
+
+        const items: NewPlugin[] = added.map(name => ({ name, description: describe(name) }));
+
+        // Laisse l'UI de Discord se monter avant d'ouvrir la modale.
         setTimeout(() => {
             try {
-                showUpdateModal(
-                    items.length
-                        ? items
-                        : [{ name: "Diagnostic", description: "La modale s'affiche (aucun plugin JUST_ADDED détecté)." }]
-                );
+                showUpdateModal(items);
             } catch (e) {
-                try {
-                    showToast("[AbyssUpdates] échec modale : " + String(e), Toasts.Type.FAILURE);
-                } catch { /* ignore */ }
                 console.error("[AbyssUpdates] impossible d'afficher la modale :", e);
             }
         }, 4000);
