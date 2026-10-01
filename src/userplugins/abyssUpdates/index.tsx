@@ -19,10 +19,12 @@
  * fois suivantes la détection est entièrement automatique.
  */
 
+import "./styles.css";
+
 import { get, set } from "@api/DataStore";
-import { ModalContent, ModalRoot, openModal } from "@utils/modal";
+import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
-import { React } from "@webpack/common";
+import { Forms, React } from "@webpack/common";
 import Plugins from "~plugins";
 
 const STATE_KEY = "AbyssUpdates_state";
@@ -61,105 +63,6 @@ function describe(name: string): string {
     return p?.description ?? "";
 }
 
-const STYLE_ID = "abyss-updates-style";
-const CSS = `
-.abyss-up-root { overflow: hidden; }
-.abyss-up-header {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    padding: 20px 20px 16px;
-    overflow: hidden;
-}
-.abyss-up-header::before {
-    content: "";
-    position: absolute;
-    top: -60px; right: -40px;
-    width: 220px; height: 160px;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.35), transparent 70%);
-    filter: blur(14px);
-    pointer-events: none;
-}
-.abyss-up-close {
-    position: absolute;
-    top: 14px; right: 14px;
-    width: 30px; height: 30px;
-    display: grid; place-items: center;
-    border: none; border-radius: 8px;
-    background: transparent; color: var(--interactive-normal);
-    cursor: pointer; transition: background .15s, color .15s;
-}
-.abyss-up-close:hover { background: var(--background-modifier-hover); color: var(--interactive-hover); }
-.abyss-up-icon {
-    width: 42px; height: 42px; flex-shrink: 0;
-    border-radius: 13px; display: grid; place-items: center; color: #fff;
-    background: linear-gradient(145deg, #a78bfa, #7c3aed);
-    box-shadow: 0 8px 22px rgba(124, 58, 237, 0.5);
-    animation: abyss-up-pop .5s cubic-bezier(.16,1,.3,1) both;
-}
-.abyss-up-title {
-    margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.02em;
-    background: linear-gradient(110deg, #ffffff 30%, #c4b5fd);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.abyss-up-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-muted); }
-.abyss-up-list { display: flex; flex-direction: column; gap: 10px; padding: 2px 20px 20px; }
-.abyss-up-card {
-    position: relative; display: flex; gap: 12px; align-items: flex-start;
-    padding: 12px 13px; border-radius: 12px;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-accent);
-    opacity: 0; transform: translateY(10px);
-    animation: abyss-up-in .45s cubic-bezier(.16,1,.3,1) forwards;
-    transition: border-color .16s, background .16s, transform .16s;
-}
-.abyss-up-card:hover {
-    border-color: rgba(167, 139, 250, 0.55);
-    background: var(--background-secondary-alt, var(--background-tertiary));
-    transform: translateY(-1px);
-}
-.abyss-up-ptile {
-    width: 34px; height: 34px; flex-shrink: 0;
-    border-radius: 9px; display: grid; place-items: center; color: #c4b5fd;
-    background: rgba(139, 92, 246, 0.14);
-    border: 1px solid rgba(139, 92, 246, 0.32);
-}
-.abyss-up-body { min-width: 0; flex: 1; }
-.abyss-up-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.abyss-up-name { font-weight: 700; font-size: 14px; color: var(--header-primary); }
-.abyss-up-badge {
-    font-size: 9.5px; font-weight: 800; letter-spacing: 0.05em;
-    padding: 2px 7px; border-radius: 999px; color: #fff;
-    background: linear-gradient(135deg, #a78bfa, #7c3aed);
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.45);
-}
-.abyss-up-desc { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
-.abyss-up-foot {
-    display: flex; justify-content: flex-end;
-    padding: 14px 20px 18px; border-top: 1px solid var(--background-modifier-accent);
-}
-.abyss-up-btn {
-    border: none; cursor: pointer; font-weight: 700; font-size: 13.5px; color: #fff;
-    padding: 9px 22px; border-radius: 10px;
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-    box-shadow: 0 5px 18px rgba(124, 58, 237, 0.45);
-    transition: filter .15s, transform .1s;
-}
-.abyss-up-btn:hover { filter: brightness(1.12); }
-.abyss-up-btn:active { transform: scale(.97); }
-@keyframes abyss-up-in { to { opacity: 1; transform: none; } }
-@keyframes abyss-up-pop { from { opacity: 0; transform: scale(.6) rotate(-12deg); } to { opacity: 1; transform: none; } }
-`;
-
-function ensureStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    const el = document.createElement("style");
-    el.id = STYLE_ID;
-    el.textContent = CSS;
-    document.head.appendChild(el);
-}
-
 const SparkleIcon = () => (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M12 2.5l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.9L12 2.5z" />
@@ -173,53 +76,44 @@ const PuzzleIcon = () => (
     </svg>
 );
 
-const CloseIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-        <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
-    </svg>
-);
-
 function UpdatesModal({ rootProps, items }: { rootProps: any; items: NewPlugin[]; }) {
     const n = items.length;
     return (
-        <ModalRoot {...rootProps} size="small" className="abyss-up-root">
-            <div className="abyss-up-header">
-                <div className="abyss-up-icon"><SparkleIcon /></div>
-                <div>
-                    <h1 className="abyss-up-title">Quoi de neuf ?</h1>
-                    <p className="abyss-up-sub">
+        <ModalRoot {...rootProps} size="small" className="aup-root">
+            <ModalHeader separator={false}>
+                <div className="aup-header-icon"><SparkleIcon /></div>
+                <div className="aup-header-text">
+                    <Forms.FormTitle tag="h4" style={{ margin: 0, color: "#fff" }}>Quoi de neuf ?</Forms.FormTitle>
+                    <Forms.FormText className="aup-header-subtitle">
                         {n} nouveau{n > 1 ? "x" : ""} plugin{n > 1 ? "s" : ""} ajouté{n > 1 ? "s" : ""} à Abyss
-                    </p>
+                    </Forms.FormText>
                 </div>
-                <button className="abyss-up-close" onClick={rootProps.onClose} aria-label="Fermer"><CloseIcon /></button>
-            </div>
+                <ModalCloseButton onClick={rootProps.onClose} />
+            </ModalHeader>
 
-            <ModalContent>
-                <div className="abyss-up-list">
-                    {items.map((p, i) => (
-                        <div key={p.name} className="abyss-up-card" style={{ animationDelay: `${i * 70}ms` }}>
-                            <div className="abyss-up-ptile"><PuzzleIcon /></div>
-                            <div className="abyss-up-body">
-                                <div className="abyss-up-name-row">
-                                    <span className="abyss-up-name">{p.name}</span>
-                                    <span className="abyss-up-badge">NOUVEAU</span>
-                                </div>
-                                {p.description && <div className="abyss-up-desc">{p.description}</div>}
+            <ModalContent className="aup-content">
+                {items.map(p => (
+                    <div key={p.name} className="aup-card">
+                        <div className="aup-card-icon"><PuzzleIcon /></div>
+                        <div className="aup-card-body">
+                            <div className="aup-card-title-row">
+                                <span className="aup-card-title">{p.name}</span>
+                                <span className="aup-badge">Nouveau</span>
                             </div>
+                            {p.description && <div className="aup-card-subtitle">{p.description}</div>}
                         </div>
-                    ))}
-                </div>
+                    </div>
+                ))}
             </ModalContent>
 
-            <div className="abyss-up-foot">
-                <button className="abyss-up-btn" onClick={rootProps.onClose}>Génial !</button>
-            </div>
+            <ModalFooter className="aup-footer">
+                <button className="aup-btn" onClick={rootProps.onClose}>Génial !</button>
+            </ModalFooter>
         </ModalRoot>
     );
 }
 
 function showUpdateModal(items: NewPlugin[]) {
-    ensureStyle();
     openModal(props => <UpdatesModal rootProps={props} items={items} />);
 }
 

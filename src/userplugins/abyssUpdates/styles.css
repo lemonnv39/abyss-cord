@@ -1,0 +1,115 @@
+/* AbyssUpdates — pop-up "Quoi de neuf", calquée sur la DA du plugin Cleaner
+   (plat, natif Discord : #313338 / #2b2d31, accent blurple #5865f2). */
+
+.aup-root {
+    background: #313338;
+}
+
+.aup-header-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(88, 101, 242, 0.2);
+    color: #5865f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+}
+
+.aup-header-text {
+    flex: 1;
+}
+
+.aup-header-subtitle {
+    font-size: 12px;
+    color: #b5bac1;
+    margin-top: 2px;
+}
+
+.aup-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+}
+
+.aup-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #2b2d31;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.aup-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    flex-shrink: 0;
+    background: rgba(88, 101, 242, 0.2);
+    color: #5865f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.aup-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.aup-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.aup-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.aup-card-subtitle {
+    font-size: 12px;
+    color: #949ba4;
+    margin-top: 3px;
+    line-height: 1.4;
+}
+
+.aup-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #ffffff;
+    background: #5865f2;
+    flex-shrink: 0;
+}
+
+.aup-footer {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.aup-btn {
+    width: 100%;
+    padding: 11px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: #5865f2;
+    color: #ffffff;
+    transition: background 0.15s ease;
+}
+.aup-btn:hover {
+    background: #4752c4;
+}
