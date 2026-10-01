@@ -1,6 +1,6 @@
 // Abyss (abyss-cord) — Discord client mod, fork d'Equicord/Vencord
 // https://github.com/lemonnv39/abyss-cord
-// Build: af3792c12bd44488e5db618fc361896005a57569
+// Build: e4d03385647427b4fc44e362322329344f743a71
 // Standalone: true
 // Platform: Universal
 // Updater Disabled: true
