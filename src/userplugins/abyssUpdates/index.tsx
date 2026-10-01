@@ -32,7 +32,7 @@ const STATE_KEY = "AbyssUpdates_state";
 // Bumpe ce numéro pour RÉ-ANNONCER JUST_ADDED à tout le monde au prochain
 // lancement (utile pour mettre en avant un lot de nouveautés même chez ceux qui
 // ont déjà l'historique). Sans bump, la détection reste purement automatique.
-const ANNOUNCE_VERSION = 1;
+const ANNOUNCE_VERSION = 2;
 
 // Plugins mis en avant pour l'annonce courante (affichés tant que ANNOUNCE_VERSION
 // n'a pas encore été vu). À vider quand on ne veut plus d'annonce forcée.
