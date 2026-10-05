@@ -5,104 +5,82 @@
  */
 
 /*
- * NoQuests — supprime toute la section « Quêtes » de Discord pour ne jamais
- * accepter une quête par accident (et récupérer un badge non désiré).
+ * NoQuests — bloque toute la section « Quêtes » de Discord pour ne jamais
+ * accepter une quête (et récupérer un badge) par accident.
  *
- * Approche robuste côté DONNÉES plutôt que de chasser des classes CSS qui
- * changent souvent : on neutralise le `QuestsStore` (nom de store stable) pour
- * que `quests` renvoie toujours une collection vide. Du coup la barre de quêtes
- * au-dessus des MP, les pop-ups/upsell, l'onglet rempli et les invites à
- * s'inscrire n'ont plus rien à afficher — donc plus de bouton « Accepter » à
- * cliquer par mégarde. Le getter avale aussi les réassignations (setter no-op),
- * si bien qu'un fetch de quêtes ultérieur ne le « re-remplit » pas.
+ * Plutôt que de réimplémenter la suppression des quêtes (fragile, Discord
+ * bouge souvent ces modules), on s'appuie sur le plugin Equicord **Questify**
+ * qui le fait déjà proprement via son réglage « Disable all Quest features »
+ * (disableQuestsEverything). Ce plugin se contente donc, UNE SEULE FOIS,
+ * d'activer Questify et de cocher ce réglage. On ne le refait pas à chaque
+ * démarrage : si l'utilisateur rallume les quêtes plus tard, son choix est
+ * respecté.
  *
- * Le CSS (noQuests.css) ne fait qu'un nettoyage visuel d'appoint : l'entrée
- * d'onglet « Quêtes » et quelques encarts statiques. NB : ça n'enlève pas un
- * badge de quête DÉJÀ obtenu sur un compte (c'est côté serveur Discord) — ça
- * empêche seulement les futurs accidents et masque la section localement.
+ * Les patches de Questify s'appliquent au CHARGEMENT du bundle : la toute
+ * première fois (si Questify était éteint), il faut redémarrer Discord une fois
+ * pour que le blocage prenne effet — d'où le toast d'info. Ensuite c'est
+ * permanent et transparent.
+ *
+ * NB : ça n'enlève pas un badge de quête DÉJÀ obtenu (côté serveur Discord) ;
+ * ça empêche seulement les futurs accidents.
  */
 
-import { disableStyle, enableStyle } from "@api/Styles";
+import { get, set } from "@api/DataStore";
+import { Settings } from "@api/Settings";
 import definePlugin from "@utils/types";
-import { findStore } from "@webpack";
+import { showToast, Toasts } from "@webpack/common";
 
-import style from "./noQuests.css?managed";
-
-interface Patched {
-    store: any;
-    /** Descripteur d'origine si `quests` était une propriété PROPRE du store. */
-    ownDesc: PropertyDescriptor | undefined;
-}
-
-let patched: Patched | null = null;
-
-function neutralizeStore() {
-    let store: any;
-    try {
-        store = findStore("QuestsStore");
-    } catch {
-        store = null;
-    }
-    if (!store) return;
-
-    const proto = Object.getPrototypeOf(store);
-    const hasQuests =
-        Object.getOwnPropertyDescriptor(store, "quests") ||
-        (proto && Object.getOwnPropertyDescriptor(proto, "quests"));
-    if (!hasQuests) return;
-
-    patched = {
-        store,
-        ownDesc: Object.getOwnPropertyDescriptor(store, "quests"),
-    };
-
-    // get -> toujours vide ; set -> no-op (évite de casser le store si son
-    // handler réassigne `this.quests`, et empêche tout re-remplissage).
-    Object.defineProperty(store, "quests", {
-        configurable: true,
-        get: () => new Map(),
-        set: () => {},
-    });
-
-    try {
-        store.emitChange?.();
-    } catch {
-        /* best-effort */
-    }
-}
-
-function restoreStore() {
-    if (!patched) return;
-    const { store, ownDesc } = patched;
-    try {
-        if (ownDesc) {
-            // `quests` était propre au store : on remet le descripteur d'origine.
-            Object.defineProperty(store, "quests", ownDesc);
-        } else {
-            // Il venait du prototype : retirer notre override ré-expose l'original.
-            delete store.quests;
-        }
-        store.emitChange?.();
-    } catch {
-        /* best-effort */
-    }
-    patched = null;
-}
+const APPLIED_KEY = "NoQuests_appliedQuestify";
 
 export default definePlugin({
     name: "NoQuests",
     description:
-        "Supprime toute la section Quêtes de Discord (onglet, bannières, pop-ups) pour ne jamais accepter une quête — ni récupérer un badge — par accident.",
+        "Bloque toute la section Quêtes de Discord (via Questify) pour ne jamais accepter une quête — ni récupérer un badge — par accident. S'active une seule fois ; ton choix est ensuite respecté.",
     authors: [{ name: "0ctane", id: 0n }],
     enabledByDefault: true,
 
-    start() {
-        enableStyle(style);
-        neutralizeStore();
-    },
+    async start() {
+        // On n'applique la config qu'une seule fois, pour ne pas écraser un
+        // choix ultérieur de l'utilisateur (qui voudrait réactiver les quêtes).
+        let applied = false;
+        try {
+            applied = !!(await get(APPLIED_KEY));
+        } catch {
+            applied = false;
+        }
+        if (applied) return;
 
-    stop() {
-        disableStyle(style);
-        restoreStore();
+        let wasEnabled = false;
+        try {
+            // Accéder à Settings.plugins.Questify matérialise l'objet de réglages.
+            const q = Settings.plugins.Questify as any;
+            wasEnabled = q?.enabled === true;
+            q.enabled = true;
+            q.disableQuestsEverything = true;
+        } catch (e) {
+            console.error("[NoQuests] impossible d'appliquer les réglages Questify :", e);
+            return;
+        }
+
+        try {
+            await set(APPLIED_KEY, true);
+        } catch {
+            /* best-effort */
+        }
+
+        // Si Questify était éteint, ses patches ne s'appliquent qu'au prochain
+        // chargement → on invite à redémarrer une fois.
+        if (!wasEnabled) {
+            setTimeout(() => {
+                try {
+                    showToast(
+                        "Abyss : section Quêtes bloquée — redémarre Discord une fois pour finaliser.",
+                        Toasts.Type.SUCCESS
+                    );
+                } catch {
+                    /* ignore */
+                }
+            }, 4000);
+        }
     },
 });
