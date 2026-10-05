@@ -1,0 +1,17 @@
+/* Abyss NoQuests — nettoyage visuel d'appoint.
+   Le gros est fait côté données (QuestsStore neutralisé dans index.tsx) ; ici on
+   masque l'onglet "Quêtes" et quelques encarts statiques.
+
+   Sélecteurs volontairement SPÉCIFIQUES : on évite [class*="quest"] qui
+   matcherait aussi "request" (demandes d'amis, etc.). Les libellés d'onglet sont
+   ciblés en égalité exacte. */
+
+[aria-label="Quêtes"],
+[aria-label="Quests"],
+[class*="questsUpsell" i],
+[class*="questsEntry" i],
+[class*="questsHome" i],
+[class*="questBar" i],
+[class*="questButton" i] {
+    display: none !important;
+}
