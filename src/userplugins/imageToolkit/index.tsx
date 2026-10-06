@@ -120,6 +120,27 @@ function inActivationTarget(el: Element | null): boolean {
     return false;
 }
 
+// Contextes où cliquer un avatar/bannière a DÉJÀ un rôle propre (ouvrir le
+// popout de profil, changer son avatar dans les réglages, interagir avec une
+// tuile en vocal) : on n'y agrandit pas, sinon ça devient envahissant. On garde
+// en revanche l'agrandissement sur la vraie carte de profil complète, en chat,
+// etc. Détection par conteneur ancêtre (sous-chaîne de classe, insensible à la
+// casse) — robuste aux hash de classes de Discord.
+const EXCLUDED_CONTAINERS = [
+    '[class*="userPopout" i]',           // popout de profil (survol)
+    '[class*="userProfilePopout" i]',
+    '[class*="accountProfilePopout" i]', // panneau compte en bas à gauche
+    '[class*="standardSidebarView" i]',  // réglages utilisateur (dont l'éditeur de profil)
+    '[class*="userSettings" i]',
+    '[class*="callContainer" i]',        // vue d'appel vocal/vidéo
+    '[class*="voiceCallWrapper" i]',
+    '[class*="videoGrid" i]',            // grille des participants en vocal
+].join(",");
+
+function inExcludedContext(el: Element | null): boolean {
+    return !!(el && el.closest && el.closest(EXCLUDED_CONTAINERS));
+}
+
 // Walk up from the clicked node; at each level inspect the element itself and
 // its <img>/<image> descendants. Hit-test against the cursor so an overlay
 // (status ring, hover layer) sitting on top of the real avatar/banner doesn't
@@ -136,6 +157,9 @@ function findMedia(target: EventTarget | null, x: number, y: number): Hit | null
             if (!kind) continue;
             const r = c.getBoundingClientRect();
             if (!pointIn(r, x, y)) continue;
+            // Zones où l'agrandissement est indésirable (popout, réglages/éditeur
+            // de profil, vocal) — vaut pour les avatars ET les bannières.
+            if (inExcludedContext(c)) continue;
             if (kind === "avatar" && (r.width < MIN_AVATAR_SIZE || r.height < MIN_AVATAR_SIZE)) continue;
             if (kind === "banner" && r.width < MIN_BANNER_WIDTH) continue;
             // Only PROFILE-card banners should enlarge. A banner in the app chrome
