@@ -6,8 +6,8 @@
 
 import "./styles.css";
 
-import { DataStore } from "@api/index";
 import { HeaderBarButton } from "@api/HeaderBar";
+import { DataStore } from "@api/index";
 import { ChevronSmallDownIcon, CopyIcon, DeleteIcon, FolderIcon, OpenExternalIcon, PlusIcon, ShieldIcon, UserIcon } from "@components/Icons";
 import { copyToClipboard } from "@utils/clipboard";
 import { classNameFactory } from "@utils/css";
@@ -15,7 +15,7 @@ import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } fro
 import definePlugin, { PluginNative } from "@utils/types";
 import { RenderModalProps } from "@vencord/discord-types";
 import { findByProps } from "@webpack";
-import { Button, ContextMenuApi, FluxDispatcher, Forms, IconUtils, Menu, React, TabBar, Toasts, useDrag, useDrop, useEffect, useMemo, useRef, useState } from "@webpack/common";
+import { Alerts, Button, ContextMenuApi, FluxDispatcher, Forms, IconUtils, Menu, TabBar, Toasts, useDrag, useDrop, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TokenImporter — ajoute/bascule entre TES PROPRES comptes Discord via un token
@@ -49,6 +49,12 @@ export interface SavedAccount {
     // fonctionnalité n'ont pas ce champ — ils tombent naturellement dans
     // "Non classés" sans migration nécessaire.
     folderId?: string | null;
+    // En mémoire seulement (jamais enregistré tel quel) : le token n'a pas pu
+    // être déchiffré (données copiées depuis un autre PC / une autre session
+    // Windows). `sealed` garde la valeur chiffrée d'origine pour la réécrire
+    // intacte au lieu de la perdre.
+    locked?: boolean;
+    sealed?: string;
 }
 
 export interface Folder {
@@ -86,27 +92,61 @@ export async function getAccounts(): Promise<SavedAccount[]> {
     const raw = (await DataStore.get<SavedAccount[]>(STORE_KEY)) ?? [];
     const out: SavedAccount[] = [];
     for (const acc of raw) {
-        let tok = acc.token;
-        if (tok.startsWith(ENC_PREFIX)) {
-            const dec = await Native.decryptToken(tok.slice(ENC_PREFIX.length));
-            if (dec) tok = dec;
+        if (!acc?.id || typeof acc.token !== "string") continue;
+        if (!acc.token.startsWith(ENC_PREFIX)) {
+            out.push({ ...acc });
+            continue;
         }
-        out.push({ ...acc, token: tok });
+        const dec = await Native.decryptToken(acc.token.slice(ENC_PREFIX.length)).catch(() => null);
+        // Indéchiffrable : on ne fait pas passer la valeur chiffrée pour un
+        // token (elle serait recopiée, chiffrée une 2ᵉ fois, et perdue).
+        out.push(dec ? { ...acc, token: dec } : { ...acc, token: "", locked: true, sealed: acc.token });
     }
     return out;
 }
 
-async function saveAccounts(accounts: SavedAccount[]): Promise<void> {
-    const unique = new Map<string, SavedAccount>();
-    for (const a of accounts) unique.set(a.id, a);
+// Les enregistrements passent l'un après l'autre : deux actions rapprochées
+// (déplacer puis supprimer…) ne peuvent pas s'écraser mutuellement.
+let saveQueue: Promise<void> = Promise.resolve();
 
-    const encrypted: SavedAccount[] = [];
-    for (const a of unique.values()) {
-        const enc = await Native.encryptToken(a.token);
-        encrypted.push({ ...a, token: enc ? ENC_PREFIX + enc : a.token });
-    }
-    await DataStore.set(STORE_KEY, encrypted);
+function saveAccounts(accounts: SavedAccount[]): Promise<void> {
+    const run = async () => {
+        const unique = new Map<string, SavedAccount>();
+        for (const a of accounts) unique.set(a.id, a);
+
+        const stored: SavedAccount[] = [];
+        for (const { locked, sealed, ...a } of unique.values()) {
+            if (locked) {
+                if (sealed) stored.push({ ...a, token: sealed });
+                continue;
+            }
+            const enc = await Native.encryptToken(a.token).catch(() => null);
+            stored.push({ ...a, token: enc ? ENC_PREFIX + enc : a.token });
+        }
+        await DataStore.set(STORE_KEY, stored);
+    };
+    saveQueue = saveQueue.then(run, run);
+    return saveQueue;
 }
+
+function confirm(title: string, body: string, confirmText: string, onConfirm: () => void) {
+    Alerts.show({
+        title,
+        body,
+        confirmText,
+        cancelText: "Annuler",
+        confirmColor: Button.Colors.RED,
+        onConfirm,
+    });
+}
+
+const CHECK_ERROR_LABEL: Record<string, string> = {
+    unauthorized: "Token invalide ou expiré",
+    malformed: "Token mal formé",
+    rate_limited: "Discord limite les vérifications — réessaie dans un instant",
+    timeout: "Discord ne répond pas — réessaie",
+    network_error: "Pas de connexion à Discord",
+};
 
 // Écrit le token dans le localStorage de l'origine Discord, de façon FIABLE.
 // Discord SUPPRIME `window.localStorage` du renderer (anti-vol de token) : y
@@ -134,10 +174,13 @@ function persistToken(token: string): boolean {
     }
 
     // Chemin secondaire : window.localStorage direct (marche quand Discord ne
-    // l'a pas retiré). `?.` évite de lever si le getter est absent.
+    // l'a pas retiré). Absent = rien d'écrit : ça ne compte pas comme réussi.
     try {
-        window.localStorage?.setItem?.("token", value);
-        ok = true;
+        const ls = window.localStorage as Storage | undefined;
+        if (typeof ls?.setItem === "function") {
+            ls.setItem("token", value);
+            ok = true;
+        }
     } catch (e) {
         console.error("[TokenImporter] persist via window failed:", e);
     }
@@ -373,16 +416,20 @@ function CrossIcon() {
 // MultiInstance (déclaré en dépendance ci-dessous). Le token ne quitte jamais
 // cette machine : MultiInstance se contente de le poser dans le localStorage
 // d'une nouvelle session Electron dédiée à ce compte.
-function openInStandaloneInstance(a: SavedAccount) {
+async function openInStandaloneInstance(a: SavedAccount) {
     try {
         const mi = (window as any).VencordNative?.pluginHelpers?.MultiInstance;
         if (!mi?.openInstanceWindow) {
             Toasts.show({ message: "Le plugin MultiInstance doit être activé", type: Toasts.Type.FAILURE, id: Toasts.genId() });
             return;
         }
-        mi.openInstanceWindow(a.token, a.id, a.username);
+        const res = await mi.openInstanceWindow(a.token, a.id, a.username);
+        if (res && res.ok === false) {
+            Toasts.show({ message: `Fenêtre impossible à ouvrir${res.error ? ` : ${res.error}` : ""}`, type: Toasts.Type.FAILURE, id: Toasts.genId() });
+        }
     } catch (e) {
         console.error("[TokenImporter] openInStandaloneInstance failed:", e);
+        Toasts.show({ message: "Fenêtre impossible à ouvrir", type: Toasts.Type.FAILURE, id: Toasts.genId() });
     }
 }
 
@@ -451,16 +498,18 @@ function AccountRow({ account, onRemove, onRename }: { account: SavedAccount; on
                         {account.username}{account.discriminator && account.discriminator !== "0" ? `#${account.discriminator}` : ""}
                     </span>
                 )}
-                <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>
+                {account.locked
+                    ? <span className={cl("token-locked")}>Verrouillé sur cet appareil — recolle ce token pour le réactiver</span>
+                    : <span className={cl("token-hidden")}>•••• •••• •••• ••••</span>}
             </div>
             <div className={cl("row-actions")}>
-                <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} onClick={() => switchToAccount(account.token)}>
+                <Button size={Button.Sizes.SMALL} color={Button.Colors.BRAND} disabled={account.locked} onClick={() => switchToAccount(account.token)}>
                     Basculer
                 </Button>
-                <button className={cl("icon-btn")} title="Ouvrir dans une nouvelle fenêtre" onClick={() => openInStandaloneInstance(account)}>
+                <button className={cl("icon-btn")} title="Ouvrir dans une nouvelle fenêtre" disabled={account.locked} onClick={() => openInStandaloneInstance(account)}>
                     <OpenExternalIcon width={17} height={17} />
                 </button>
-                <button className={cl("icon-btn")} title="Copier le token" onClick={() => {
+                <button className={cl("icon-btn")} title="Copier le token" disabled={account.locked} onClick={() => {
                     copyToClipboard(account.token);
                     Toasts.show({ message: "Token copié", type: Toasts.Type.SUCCESS, id: Toasts.genId() });
                 }}>
@@ -664,14 +713,24 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
     // déchiffre au chargement) — le natif ne fait que les écrire dans le
     // dossier que l'utilisateur choisit. Format demandé, une ligne par compte :
     //   account name: <pseudo> | token -> <token>
-    async function exportToTxt() {
+    function exportToTxt() {
+        confirm(
+            "Exporter les tokens en clair ?",
+            "Les fichiers .txt contiendront tes tokens lisibles par n'importe qui (ou n'importe quel programme) qui y a accès. Un token donne un accès complet au compte, sans mot de passe ni 2FA. Range-les en lieu sûr et supprime-les quand tu n'en as plus besoin.",
+            "Exporter",
+            () => void doExport(),
+        );
+    }
+
+    async function doExport() {
+        const usable = (list: SavedAccount[]) => list.filter(a => !a.locked && a.token).map(a => ({ username: a.username, token: a.token }));
         const groups = folders.map(f => ({
             name: f.name,
-            accounts: (accountsByFolder.get(f.id) ?? []).map(a => ({ username: a.username, token: a.token })),
+            accounts: usable(accountsByFolder.get(f.id) ?? []),
         }));
-        const unsorted = accountsByFolder.get(null) ?? [];
+        const unsorted = usable(accountsByFolder.get(null) ?? []);
         if (unsorted.length) {
-            groups.push({ name: "Non classés", accounts: unsorted.map(a => ({ username: a.username, token: a.token })) });
+            groups.push({ name: "Non classés", accounts: unsorted });
         }
 
         const nonEmpty = groups.filter(g => g.accounts.length > 0);
@@ -699,7 +758,6 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
             <div className={cl("saved-toolbar")}>
                 <Button
                     size={Button.Sizes.SMALL}
-                    look={Button.Looks.OUTLINED}
                     color={Button.Colors.PRIMARY}
                     onClick={copyMyToken}
                 >
@@ -707,7 +765,6 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                 </Button>
                 <Button
                     size={Button.Sizes.SMALL}
-                    look={Button.Looks.OUTLINED}
                     color={Button.Colors.PRIMARY}
                     onClick={addFolder}
                 >
@@ -715,7 +772,6 @@ function SavedAccountsTab({ accounts, folders, loaded, onRemove, onMoveAccount, 
                 </Button>
                 <Button
                     size={Button.Sizes.SMALL}
-                    look={Button.Looks.OUTLINED}
                     color={Button.Colors.PRIMARY}
                     onClick={exportToTxt}
                 >
@@ -771,7 +827,7 @@ function AddTokenTab({ onAdded }: { onAdded(accounts: SavedAccount[]): void; }) 
     const [paste, setPaste] = useState("");
     const [detected, setDetected] = useState(0);
     const [checking, setChecking] = useState(false);
-    const [results, setResults] = useState<{ token: string; status: "valid" | "invalid"; username?: string; }[]>([]);
+    const [results, setResults] = useState<{ status: "added" | "updated" | "known" | "invalid"; label: string; }[]>([]);
 
     function handlePasteChange(val: string) {
         setPaste(val);
@@ -783,36 +839,49 @@ function AddTokenTab({ onAdded }: { onAdded(accounts: SavedAccount[]): void; }) 
         if (!tokens.length) return;
         setChecking(true);
         setResults([]);
-        const existing = await getAccounts();
-        const newResults: { token: string; status: "valid" | "invalid"; username?: string; }[] = [];
-
-        for (const tok of tokens) {
-            let r: CheckResult;
-            try { r = await Native.checkToken(tok); } catch { r = { valid: false }; }
-            if (r.valid && r.user) {
-                const u = r.user;
-                if (!existing.find(a => a.id === u.id)) {
-                    existing.push({
-                        id: u.id,
-                        token: tok,
-                        username: u.global_name || u.username,
-                        discriminator: u.discriminator ?? "0",
-                        avatar: u.avatar ?? "",
-                    });
+        const newResults: { status: "added" | "updated" | "known" | "invalid"; label: string; }[] = [];
+        const retry: string[] = [];
+        try {
+            const existing = await getAccounts();
+            for (const tok of tokens) {
+                let r: CheckResult;
+                try { r = await Native.checkToken(tok); } catch { r = { valid: false, error: "exception" }; }
+                if (r.valid && r.user) {
+                    const u = r.user;
+                    const name = u.global_name || u.username;
+                    const known = existing.find(a => a.id === u.id);
+                    if (!known) {
+                        existing.push({ id: u.id, token: tok, username: name, discriminator: u.discriminator ?? "0", avatar: u.avatar ?? "" });
+                        newResults.push({ status: "added", label: name });
+                    } else if (known.locked || known.token !== tok) {
+                        // Nouveau token pour un compte déjà là (déconnexion,
+                        // mot de passe changé, compte verrouillé) : on le
+                        // remplace, en gardant le nom choisi et le dossier.
+                        Object.assign(known, { token: tok, locked: false, sealed: undefined, avatar: u.avatar ?? "" });
+                        newResults.push({ status: "updated", label: `${known.username} — token mis à jour` });
+                    } else {
+                        newResults.push({ status: "known", label: `${known.username} — déjà enregistré` });
+                    }
+                } else {
+                    // Limite de Discord / réseau : le token n'est pas forcément
+                    // mauvais, on le laisse dans la zone pour réessayer.
+                    if (r.error === "rate_limited" || r.error === "timeout" || r.error === "network_error") retry.push(tok);
+                    newResults.push({ status: "invalid", label: CHECK_ERROR_LABEL[r.error ?? ""] ?? "Token invalide" });
                 }
-                newResults.push({ token: tok, status: "valid", username: u.global_name || u.username });
-            } else {
-                newResults.push({ token: tok, status: "invalid" });
             }
-        }
 
-        await saveAccounts(existing);
-        injectIntoNativeSwitcher(existing);
-        onAdded(existing);
-        setResults(newResults);
-        setPaste("");
-        setDetected(0);
-        setChecking(false);
+            await saveAccounts(existing);
+            injectIntoNativeSwitcher(existing);
+            onAdded(existing);
+        } catch (e) {
+            console.error("[TokenImporter] add failed:", e);
+            newResults.push({ status: "invalid", label: "Enregistrement impossible" });
+        } finally {
+            setResults(newResults);
+            setPaste(retry.join("\n"));
+            setDetected(retry.length);
+            setChecking(false);
+        }
     }
 
     return (
@@ -823,7 +892,7 @@ function AddTokenTab({ onAdded }: { onAdded(accounts: SavedAccount[]): void; }) 
                     className={cl("textarea")}
                     value={paste}
                     onChange={e => handlePasteChange(e.currentTarget.value)}
-                    placeholder="eyJhbGciOi... (un token par ligne)"
+                    placeholder="MTA2NzM…xYz.GaBcDe.…  (un token par ligne)"
                     rows={5}
                 />
                 <div className={cl("add-footer")}>
@@ -840,9 +909,9 @@ function AddTokenTab({ onAdded }: { onAdded(accounts: SavedAccount[]): void; }) 
                 {results.length > 0 && (
                     <div className={cl("results")}>
                         {results.map((r, i) => (
-                            <div key={i} className={cl("result-row", r.status === "valid" ? "result-row--valid" : "result-row--invalid")}>
-                                {r.status === "valid" ? <CheckIcon /> : <CrossIcon />}
-                                <span>{r.status === "valid" ? r.username : "Token invalide"}</span>
+                            <div key={i} className={cl("result-row", r.status === "invalid" ? "result-row--invalid" : "result-row--valid")}>
+                                {r.status === "invalid" ? <CrossIcon /> : <CheckIcon />}
+                                <span>{r.label}</span>
                             </div>
                         ))}
                     </div>
@@ -858,31 +927,42 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
     const [accounts, setAccounts] = useState<SavedAccount[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [encrypted, setEncrypted] = useState(true);
 
     useEffect(() => {
         Promise.all([getAccounts(), getFolders()]).then(([v, f]) => {
             setAccounts(v);
             setFolders(f);
-            setLoaded(true);
-        });
+        }).catch(e => {
+            console.error("[TokenImporter] load failed:", e);
+        }).finally(() => setLoaded(true));
+        Native.isEncryptionAvailable().then(setEncrypted).catch(() => setEncrypted(false));
     }, []);
 
-    async function removeAccount(id: string) {
-        const updated = accounts.filter(a => a.id !== id);
-        setAccounts(updated);
-        await saveAccounts(updated);
+    function removeAccount(id: string) {
+        const acc = accounts.find(a => a.id === id);
+        confirm(
+            "Supprimer ce compte ?",
+            `« ${acc?.username ?? id} » et son token seront retirés de la liste. Garde une copie du token si tu veux le rajouter plus tard.`,
+            "Supprimer",
+            () => updateAccounts(list => list.filter(a => a.id !== id)),
+        );
     }
 
-    async function moveAccount(accountId: string, folderId: string | null) {
-        const updated = accounts.map(a => a.id === accountId ? { ...a, folderId } : a);
-        setAccounts(updated);
-        await saveAccounts(updated);
+    function updateAccounts(change: (list: SavedAccount[]) => SavedAccount[]) {
+        setAccounts(prev => {
+            const updated = change(prev);
+            void saveAccounts(updated);
+            return updated;
+        });
     }
 
-    async function renameAccount(accountId: string, name: string) {
-        const updated = accounts.map(a => a.id === accountId ? { ...a, username: name } : a);
-        setAccounts(updated);
-        await saveAccounts(updated);
+    function moveAccount(accountId: string, folderId: string | null) {
+        updateAccounts(list => list.map(a => a.id === accountId ? { ...a, folderId } : a));
+    }
+
+    function renameAccount(accountId: string, name: string) {
+        updateAccounts(list => list.map(a => a.id === accountId ? { ...a, username: name } : a));
     }
 
     async function changeFolders(updated: Folder[]) {
@@ -896,10 +976,9 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
     // appel et perdrait tous les déplacements sauf le dernier.
     async function deleteFolder(folderId: string) {
         const updatedFolders = folders.filter(f => f.id !== folderId);
-        const updatedAccounts = accounts.map(a => a.folderId === folderId ? { ...a, folderId: null } : a);
         setFolders(updatedFolders);
-        setAccounts(updatedAccounts);
-        await Promise.all([saveFolders(updatedFolders), saveAccounts(updatedAccounts)]);
+        updateAccounts(list => list.map(a => a.folderId === folderId ? { ...a, folderId: null } : a));
+        await saveFolders(updatedFolders);
     }
 
     return (
@@ -934,6 +1013,11 @@ function TokenImporterModal({ modalProps }: { modalProps: RenderModalProps; }) {
             </TabBar>
 
             <ModalContent className={cl("content")}>
+                {!encrypted && (
+                    <div className={cl("warning")}>
+                        Le chiffrement de Windows n'est pas disponible : les tokens sont enregistrés en clair sur ce PC.
+                    </div>
+                )}
                 {tab === Tab.Saved && (
                     <SavedAccountsTab
                         accounts={accounts}

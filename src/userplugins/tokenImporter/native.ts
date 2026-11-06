@@ -4,17 +4,41 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { app, BrowserWindow, dialog, net, safeStorage } from "electron";
 import { spawn } from "child_process";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { BrowserWindow, dialog, IpcMainInvokeEvent, net, safeStorage } from "electron";
+import { existsSync, writeFileSync } from "fs";
 import { join } from "path";
+
+const CHECK_TIMEOUT_MS = 10_000;
+// Un token Discord : trois parties base64url séparées par des points. Tout le
+// reste (retour à la ligne, espaces…) est refusé avant d'être mis dans un
+// en-tête HTTP.
+const TOKEN_SHAPE = /^[\w-]+\.[\w-]+\.[\w-]+$|^mfa\.[\w-]+$/;
 
 // Vérifie un token en interrogeant l'API officielle Discord (lecture seule,
 // /users/@me). N'écrit rien, ne touche à aucun autre compte.
-export async function checkToken(_: any, token: string): Promise<{ valid: boolean; user?: any; error?: string; }> {
+export async function checkToken(_: IpcMainInvokeEvent, token: string): Promise<{ valid: boolean; user?: any; error?: string; }> {
+    if (typeof token !== "string" || !TOKEN_SHAPE.test(token)) return { valid: false, error: "malformed" };
+
     return new Promise(resolve => {
+        let done = false;
+        const finish = (r: { valid: boolean; user?: any; error?: string; }) => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve(r);
+        };
+
+        let req: Electron.ClientRequest;
+        // Sans réponse de Discord, on ne laisse pas l'interface sur
+        // « Vérification... » indéfiniment.
+        const timer = setTimeout(() => {
+            try { req?.abort(); } catch { }
+            finish({ valid: false, error: "timeout" });
+        }, CHECK_TIMEOUT_MS);
+
         try {
-            const req = net.request({
+            req = net.request({
                 method: "GET",
                 url: "https://discord.com/api/v9/users/@me",
             });
@@ -25,24 +49,33 @@ export async function checkToken(_: any, token: string): Promise<{ valid: boolea
                 res.on("data", (chunk: Buffer) => { data += chunk.toString(); });
                 res.on("end", () => {
                     if (res.statusCode === 200) {
-                        try { resolve({ valid: true, user: JSON.parse(data) }); }
-                        catch { resolve({ valid: false, error: "parse_error" }); }
+                        try { finish({ valid: true, user: JSON.parse(data) }); }
+                        catch { finish({ valid: false, error: "parse_error" }); }
                     } else if (res.statusCode === 401 || res.statusCode === 403) {
-                        resolve({ valid: false, error: "unauthorized" });
+                        finish({ valid: false, error: "unauthorized" });
                     } else if (res.statusCode === 429) {
-                        resolve({ valid: false, error: "rate_limited" });
+                        finish({ valid: false, error: "rate_limited" });
                     } else {
-                        resolve({ valid: false, error: `http_${res.statusCode}` });
+                        finish({ valid: false, error: `http_${res.statusCode}` });
                     }
                 });
             });
 
-            req.on("error", () => resolve({ valid: false, error: "network_error" }));
+            req.on("error", () => finish({ valid: false, error: "network_error" }));
             req.end();
         } catch {
-            resolve({ valid: false, error: "exception" });
+            finish({ valid: false, error: "exception" });
         }
     });
+}
+
+/** Le chiffrement du système (DPAPI sous Windows) est-il disponible ? */
+export function isEncryptionAvailable(_: IpcMainInvokeEvent): boolean {
+    try {
+        return safeStorage.isEncryptionAvailable();
+    } catch {
+        return false;
+    }
 }
 
 // Chiffrement local via Electron safeStorage — lié à cette session utilisateur
@@ -69,8 +102,11 @@ export async function decryptToken(_: any, encryptedBase64: string): Promise<str
 // Recharge la fenêtre au niveau du process principal — c'est ce que fait
 // réellement Ctrl+R. Un simple `location.reload()` côté renderer ne relance
 // pas proprement l'état interne de Discord après un changement de token.
-export function reload(_: any): void {
-    BrowserWindow.getFocusedWindow()?.webContents.reload();
+// On recharge la fenêtre qui a fait la demande : la fenêtre « au premier
+// plan » peut être une autre (ou aucune, si Discord n'a pas le focus), et le
+// basculement ne se ferait alors jamais.
+export function reload(event: IpcMainInvokeEvent): void {
+    event.sender.reload();
 }
 
 // ── Export des tokens vers des .txt (un fichier par dossier) ────────────────────
@@ -84,11 +120,12 @@ function sanitizeFileName(name: string): string {
 }
 
 export async function exportTokens(
-    _: any,
+    event: IpcMainInvokeEvent,
     groups: { name: string; accounts: { username: string; token: string; }[]; }[],
 ): Promise<{ ok: boolean; count?: number; dir?: string; error?: string; }> {
     try {
-        const win = BrowserWindow.getFocusedWindow();
+        if (!Array.isArray(groups)) return { ok: false, error: "invalid" };
+        const win = BrowserWindow.fromWebContents(event.sender);
         const opts = {
             title: "Choisir le dossier où exporter les tokens",
             properties: ["openDirectory", "createDirectory"] as any,
@@ -97,12 +134,21 @@ export async function exportTokens(
         if (result.canceled || !result.filePaths.length) return { ok: false, error: "canceled" };
 
         const dir = result.filePaths[0];
+        const used = new Set<string>();
         let count = 0;
         for (const group of groups) {
-            if (!group.accounts.length) continue;
-            const lines = group.accounts.map(a => `account name: ${a.username} | token -> ${a.token}`);
+            if (!group?.accounts?.length) continue;
+            // Deux dossiers du même nom (ou « Non classés ») : le second
+            // fichier n'écrase pas le premier.
+            const base = sanitizeFileName(group.name);
+            let name = base;
+            for (let n = 2; used.has(name.toLowerCase()); n++) name = `${base} (${n})`;
+            used.add(name.toLowerCase());
+
+            // Une ligne par compte : on retire les retours à la ligne d'un pseudo.
+            const lines = group.accounts.map(a => `account name: ${String(a.username).replace(/[\r\n]+/g, " ")} | token -> ${a.token}`);
             // CRLF pour une lecture propre dans le Bloc-notes Windows.
-            writeFileSync(join(dir, `${sanitizeFileName(group.name)}.txt`), lines.join("\r\n") + "\r\n", "utf8");
+            writeFileSync(join(dir, `${name}.txt`), lines.join("\r\n") + "\r\n", "utf8");
             count++;
         }
         return { ok: true, count, dir };
@@ -162,10 +208,14 @@ export async function launchLocalInstall(_: any, branch: string): Promise<{ ok: 
     if (!installDir) return { ok: false, error: "not_found" };
 
     try {
-        spawn(join(installDir, "Update.exe"), ["--processStart", exe], {
+        const child = spawn(join(installDir, "Update.exe"), ["--processStart", exe], {
             detached: true,
             stdio: "ignore",
-        }).unref();
+        });
+        // Une erreur de lancement arrive en évènement, pas en exception : sans
+        // écouteur, elle ferait planter le processus principal de Discord.
+        child.on("error", e => console.error("[TokenImporter] launch failed:", e));
+        child.unref();
         return { ok: true };
     } catch (e: any) {
         return { ok: false, error: e?.message ?? "spawn_failed" };

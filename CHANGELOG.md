@@ -16,8 +16,30 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   instead of before them, so the Abyss badge shows as the very last badge. (1.2.3
   attempted this with a wrong regex and broke injection; 1.2.4 reverted; 1.2.5 uses
   the exact live structure.)
+- `TokenImporter`: deleting an account and exporting tokens to `.txt` now ask for
+  confirmation (the export warns that the files hold the tokens in plain text).
+  Re-pasting a token for an account already saved replaces its token (keeping its
+  name and folder) instead of being silently ignored. Check results say why a token
+  was rejected (invalid, rate limited, no answer), and tokens that failed for a
+  temporary reason stay in the box to retry. The window follows Discord's theme
+  (light / dark) instead of fixed dark colours, and warns when Windows encryption is
+  unavailable (tokens then stored in plain text).
 
 ### Fixed
+- `TokenImporter`: a saved token that could not be decrypted (data copied from
+  another PC or Windows session) was kept as its encrypted value, then encrypted a
+  second time on the next save and lost for good. Such accounts are now shown as
+  locked, kept intact, and re-activated by pasting the token again.
+- `TokenImporter`: switching account reloaded the *focused* window — nothing
+  happened when Discord was not focused. It now reloads the window that asked.
+- `TokenImporter`: checking a token could hang on "Vérification..." forever when
+  Discord did not answer (10 s timeout now), and a malformed token is refused before
+  being sent. Saves are queued so two quick actions (move, rename, delete) no longer
+  overwrite each other.
+- `TokenImporter`: a failed launch of another Discord install could crash Discord's
+  main process (unhandled `error` event); export no longer overwrites a file when two
+  folders share a name; opening an account in its own window reports MultiInstance
+  errors instead of failing silently.
 - `AbyssBadges`: no badge showed up. The plugin fetched the list from the
   **private** delivery repo (`0ctane6/abyss`), and `raw.githubusercontent.com`
   returns 404 for private repos, so the list never loaded. It now fetches from
