@@ -25,7 +25,27 @@ versioning follows [Semantic Versioning](https://semver.org/) — see
   (light / dark) instead of fixed dark colours, and warns when Windows encryption is
   unavailable (tokens then stored in plain text).
 
+### Security
+- `MultiInstance`: the account token is no longer written to disk. Each window
+  used to get its own `abyss-mi-preloads/token-preload-*.js` holding the token in
+  plain text, left behind if Discord crashed. The preload is now one shared file
+  with no secret; it asks the main process for the token over a synchronous IPC
+  call (still written before Discord's own JS, so the `/login` fix holds), and
+  only windows opened by the plugin get an answer. Leftover token files from older
+  versions are deleted at startup.
+- `MultiInstance`: navigation used a prefix check, so `discord.com.anything.com`
+  counted as Discord; the full host name is now checked. Mic / camera / screen
+  share are granted to Discord pages only, not to third-party iframes. The user id
+  is validated before being used as a session name.
+
 ### Fixed
+- `MultiInstance`: the redirect away from `/login` always went to `discord.com`,
+  even for a PTB / Canary instance. On an Electron without `webContents.ipc`, the
+  fallback removed Discord's own global window-control handlers (breaking the main
+  window's buttons once the instance closed); it now leaves them alone. External
+  links clicked in an instance open in the browser instead of doing nothing;
+  `DISCORD_PRELOAD` is restored even if creating the window fails; a minimised
+  instance is restored when reopened; the debug log is reset past 1 MB.
 - `TokenImporter`: a saved token that could not be decrypted (data copied from
   another PC or Windows session) was kept as its encrypted value, then encrypted a
   second time on the next save and lost for good. Such accounts are now shown as
